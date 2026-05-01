@@ -1,76 +1,61 @@
 """Basic helper utilities for working with the NetherGames API."""
 
 from __future__ import annotations
-
 from typing import Any, Optional
-
 from flask import current_app
 import requests
 
 BASE_URL = "https://api.ngmc.co/v1/"
 DEFAULT_TIMEOUT = 10 # seconds
 
-
 # Exception classes for each error code
 class NetherGamesAPIError(Exception):
     """Base exception for NetherGames API errors."""
     pass
 
-
 class GeneralError(NetherGamesAPIError):
     """Code 0: General Error."""
     pass
-
 
 class UnknownFaction(NetherGamesAPIError):
     """Code 10005: Unknown Faction."""
     pass
 
-
 class UnknownGuild(NetherGamesAPIError):
     """Code 10006: Unknown Guild."""
     pass
-
 
 class UnknownPlayer(NetherGamesAPIError):
     """Code 10012: Unknown Player."""
     pass
 
-
 class UnknownServer(NetherGamesAPIError):
     """Code 10016: Unknown Server."""
     pass
-
 
 class MissingAccess(NetherGamesAPIError):
     """Code 20001: Missing Access."""
     pass
 
-
 class FeatureTemporarilyDisabled(NetherGamesAPIError):
     """Code 20009: Feature Temporarily Disabled."""
     pass
-
 
 class InvalidFormBody(NetherGamesAPIError):
     """Code 30001: Invalid Form Body."""
     pass
 
-
 class MissingPlayerStats(NetherGamesAPIError):
     """Code 30022: Missing Player Stats."""
     pass
-
 
 class MissingPlayerStatsByType(NetherGamesAPIError):
     """Code 30024: Missing Player Stats By Type."""
     pass
 
-
 class MaintenanceMode(NetherGamesAPIError):
     """Code 50001: Maintenance Mode."""
     pass
-
 
 # Map error codes to exception classes
 ERROR_CODE_MAP = {
@@ -86,7 +71,6 @@ ERROR_CODE_MAP = {
     30024: MissingPlayerStatsByType,
     50001: MaintenanceMode,
 }
-
 
 def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
     url = f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
@@ -117,4 +101,3 @@ def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
         raise exception_class(error_message)
 
     return data
-

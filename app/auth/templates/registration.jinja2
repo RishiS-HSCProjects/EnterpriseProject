@@ -1,9 +1,5 @@
 {% extends "app-container.html" %}
 
-{% block head %}
-    <link rel="stylesheet" href="{{ url_for('auth.static', filename='css/registration.css') }}">
-{% endblock %}
-
 {% block content %}
     <div id="form-container">
     {% block form %}{% endblock %}

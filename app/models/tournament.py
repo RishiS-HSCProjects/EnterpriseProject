@@ -8,14 +8,14 @@ class Tournament(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    start_datetime = db.Column(db.DateTime, nullable=False)
-    end_datetime = db.Column(db.DateTime, nullable=False)
+    start_datetime = db.Column(db.DateTime(timezone=True), nullable=False)
+    end_datetime = db.Column(db.DateTime(timezone=True), nullable=False)
     round_count = db.Column(db.Integer, nullable=False)
     tournament_info_message = db.Column(db.Text, nullable=True)
     tournament_info_discord_message = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    updated_at = db.Column(db.DateTime, nullable=False, default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=db.func.now())
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=db.func.now(), onupdate=db.func.now())
     
     def __repr__(self):
         return f'<Tournament {self.name} from {self.start_datetime} to {self.end_datetime}>'

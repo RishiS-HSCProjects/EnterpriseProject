@@ -1,7 +1,7 @@
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
-from ..api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
+from ..utils.api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
 from enum import Enum, auto
 
 class User(UserMixin, db.Model):
@@ -15,6 +15,12 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
     last_login_at = db.Column(db.DateTime, nullable=True)
+
+    def login(self):
+        """Update last login time."""
+        self.last_login_at = db.func.now()
+        from flask_login import login_user
+        login_user(self)
 
     def set_password(self, password):
         """Hash and set password."""
@@ -62,8 +68,14 @@ class User(UserMixin, db.Model):
         raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
     
     @classmethod
-    def create_user(cls, username, password):
-        """Create a new user if they exist in NG API and have the right ranks."""
+    def create_user(cls, username, password) -> tuple['User', dict]:
+        """
+        Create a new user if they exist in NG API and have the right ranks.
+        
+        Returns tuple:
+        - 'User' class object
+        - dict of user API data
+        """
 
         user = cls.query.filter_by(username=username).first()
         if user:
@@ -84,7 +96,7 @@ class User(UserMixin, db.Model):
             user.username = username
             user.role = Roles.ADMIN.value if is_admin else Roles.STAFF.value
             user.set_password(password)
-            return user
+            return user, player_data
         except Exception as exc:
             db.session.rollback()
             raise exc
@@ -108,8 +120,8 @@ class UserAlreadyExists(UserExceptionBase):
 
 class UserNotFound(UserExceptionBase):
     """Raised when a user is not found in the database."""
-    def __init__(self, username):
-        super().__init__(f"User with username '{username}' not found.")
+    def __init__(self, message = "User not found."):
+        super().__init__(message)
 
 class InvalidPassword(UserExceptionBase):
     """Raised when an invalid password is provided."""

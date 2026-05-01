@@ -39,8 +39,6 @@ function initFlashMessage(msg, index = 0) {
         msg.addEventListener('mouseenter', () => {
             if (msg.fadeOutStarted) return;
             pauseTimer(msg);
-            msg.style.opacity = '1';
-            msg.style.transform = 'scale(1.05)';
         });
         
         // Hover to resume timer (with bonus time)
@@ -48,8 +46,6 @@ function initFlashMessage(msg, index = 0) {
             if (msg.fadeOutStarted) return;
             msg.remaining = Math.min(msg.remaining + 2000, FLASH_DURATION);
             resumeTimer(msg);
-            msg.style.opacity = '0.95';
-            msg.style.transform = 'scale(1)';
         });
         
         // Click to dismiss immediately
