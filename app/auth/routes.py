@@ -145,6 +145,11 @@ def verify_registration_pin():
     user.role = pending.get('role')
     user.password_hash = pending.get('password_hash')
 
+    if not user.check_password(verify_form.password.data):
+        verify_form.password.errors = [*verify_form.password.errors, 'Incorrect password. Please try again.']
+        flash_all_form_errors(verify_form)
+        return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
+
     db.session.add(user)
     db.session.commit()
     session.pop('pending_registration', None)
