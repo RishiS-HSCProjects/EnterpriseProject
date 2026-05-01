@@ -2,6 +2,11 @@
 
 {% set title = "Register" %}
 
+{% block head %}
+    {{ super() }}
+    <script src="{{ url_for('auth.static', filename='js/registration.js') }}"></script>
+{% endblock %}
+
 {% block form %}
     <h2>Register</h2>
     <div id="registration-state" data-open-pin-modal="{{ 'true' if show_pin_modal else 'false' }}"></div>

@@ -1,5 +1,3 @@
-import { initializeModal } from './modal_utils.js';
-
 document.addEventListener('DOMContentLoaded', function() {
     const firstInput = document.querySelector('input[type="text"]');
     if (firstInput) {

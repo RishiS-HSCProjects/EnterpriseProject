@@ -1,7 +1,8 @@
 import os
 from enum import Enum, auto
-from discord_webhook import DiscordWebhook
+from discord_webhook import DiscordEmbed, DiscordWebhook
 from flask import current_app
+from .utils import flash
 
 class ChannelWebhookUrl(Enum):
     SECURE_WEBHOOK_URL = auto()
@@ -26,16 +27,13 @@ def send(
     content: str,
     username: str = "Enterprise Project Bot",
     header: str | None = None,
-    embeds: list[dict] | None = None,
+    embeds: list[DiscordEmbed] | None = None,
     timeout: int = 10,
 ) -> bool:
     """Send a message to a Discord webhook channel.
 
     Returns True on success, otherwise False.
     """
-    if not location.url:
-        current_app.logger.error(f"{location.name.upper} is not set. Cannot send message to webhook.")
-        return False
 
     if content is None:
         current_app.logger.warning("No content provided to Discord webhook send()")
@@ -47,7 +45,7 @@ def send(
 
     try:
         webhook = DiscordWebhook(
-            url=location.url,
+            url=location.url, # type: ignore
             username=username,
             content=message_content,
             timeout=timeout,
@@ -59,6 +57,11 @@ def send(
 
         response = webhook.execute()
         return response.status_code in (200, 204)
+    except TypeError as exc:
+        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
+        current_app.logger.error("Invalid webhook URL type provided: %s", exc)
+        return False
     except Exception as exc:
+        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
         current_app.logger.exception("error sending message to Discord webhook: %s", exc)
         return False

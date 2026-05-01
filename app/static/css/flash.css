@@ -28,7 +28,7 @@
     max-height: 70vh;
     overflow-x: hidden;
     overflow-y: auto;
-    scrollbar-width: 0.5px;
+    scrollbar-width: thin;
     align-items: center;
     pointer-events: none;
 }

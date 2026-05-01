@@ -74,8 +74,12 @@ ERROR_CODE_MAP = {
 
 def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
     url = f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
+    API_KEY = current_app.config.get('NETHERGAMES_API_KEY')
+    if not API_KEY:
+        raise NetherGamesAPIError("NetherGames API key is not configured.")
+
     headers = {
-        'Authorization': current_app.config.get('NETHERGAMES_API_KEY'),
+        'Authorization': API_KEY,
         'Content-Type': 'application/json'
     }
     response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT, headers=headers)

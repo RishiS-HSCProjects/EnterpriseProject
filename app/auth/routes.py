@@ -65,7 +65,7 @@ def register():
                 'username': user.username,
                 'password_hash': user.password_hash,
                 'role': user.role,
-                'hashed_pin': hashpw(pin.encode(), gensalt()),
+                'hashed_pin': hashpw(pin.encode(), gensalt()).decode('utf-8'),
             }
 
             discord_id = player_data.get('discordId', None)
@@ -128,7 +128,40 @@ def verify_registration_pin():
         return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
 
     from bcrypt import checkpw
-    if not checkpw(verify_form.pin.data.encode(), pending.get('hashed_pin')):
+    from werkzeug.security import check_password_hash
+
+    def pin_matches(pin: str, hashed_pin: str) -> bool | None:
+        if not isinstance(hashed_pin, str) or not hashed_pin.strip():
+            return None
+
+        if hashed_pin.startswith(('$2a$', '$2b$', '$2x$', '$2y$')):
+            try:
+                return checkpw(pin.encode(), hashed_pin.encode('utf-8'))
+            except ValueError:
+                return None
+
+        try:
+            return check_password_hash(hashed_pin, pin)
+        except ValueError:
+            return None
+
+    hashed_pin = pending.get('hashed_pin')
+    if not hashed_pin:
+        flash('Invalid or expired registration PIN. Please register again.', 'error')
+        session.pop('pending_registration', None)
+        return redirect(url_for('auth.register'))
+
+    pin_value = verify_form.pin.data or ''
+
+    pin_check = pin_matches(pin_value, hashed_pin)
+
+    if pin_check is None:
+        session.pop('pending_registration', None)
+        flash('Invalid or expired registration PIN. Please register again.', 'error')
+        return redirect(url_for('auth.register'))
+
+    if not pin_check:
+
         verify_form.pin.errors = [*verify_form.pin.errors, 'Incorrect PIN. Please try again.']
         flash_all_form_errors(verify_form)
         return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
