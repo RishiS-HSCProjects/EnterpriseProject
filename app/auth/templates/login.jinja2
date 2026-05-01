@@ -1,0 +1,25 @@
+{% extends "registration.jinja2" %}
+
+{% set title = "Login" %}
+
+{% block form %}
+    <h2>Login</h2>
+    <form method="POST" action="{{ url_for('auth.login') }}">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+            {{ form.username.label(class="field-label") }}
+            {{ form.username(class="field-input") }}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label(class="field-label") }}
+            {{ form.password(class="field-input") }}
+        </div>
+
+        <div class="auth-actions">
+            {{ form.submit(class="auth-button auth-button-primary") }}
+            <a href="{{ url_for('auth.register') }}" class="auth-button auth-button-secondary">Create an account</a>
+        </div>
+    </form>
+{% endblock %}

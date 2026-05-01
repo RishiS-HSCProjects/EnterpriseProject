@@ -1,0 +1,56 @@
+import os
+from flask import Flask
+from flask_login import LoginManager
+from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
+
+load_dotenv()
+
+db = SQLAlchemy()
+login_manager = LoginManager()
+login_manager.login_view = 'auth.login' # type: ignore
+login_manager.login_message_category = 'info'
+
+class Config:
+    """Configuration settings for PLX Management System Flask application."""
+    DEBUG = os.getenv('DEBUG', 'false').lower() in ['true', '1', 'yes']
+    FLASK_ENV = os.getenv('FLASK_ENV', 'production')
+    
+    SECRET_KEY = os.getenv('SECRET_KEY')
+    if not SECRET_KEY:
+        raise ValueError("No SECRET_KEY set for Flask application. Required for session security.")
+
+    # Respect an explicit non-empty environment variable, but treat empty string as unset
+    _db_uri = os.getenv('SQLALCHEMY_DATABASE_URI')
+    if _db_uri and _db_uri.strip():
+        SQLALCHEMY_DATABASE_URI = _db_uri
+    else:
+        default_db = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'instance', 'plx.db')
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{default_db}"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    NETHERGAMES_API_KEY = os.getenv('NETHERGAMES_API_KEY')
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    from app.models.user import User
+    return db.session.get(User, int(user_id))
+
+def create_app():
+    """Factory function to create and configure the Flask application instance."""
+    app = Flask(__name__, template_folder='templates', static_folder='static')
+    app.config.from_object(Config)
+    
+    db.init_app(app)
+    login_manager.init_app(app)
+    
+    with app.app_context():
+        db.create_all()
+
+    from app.auth.routes import auth_bp
+    app.register_blueprint(auth_bp)
+    from app.main.routes import main_bp
+    app.register_blueprint(main_bp)
+    
+    return app

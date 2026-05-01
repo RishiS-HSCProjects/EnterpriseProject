@@ -1,0 +1,94 @@
+{% extends "registration.jinja2" %}
+
+{% set title = "Register" %}
+
+{% block head %}
+    {{ super() }}
+    <script src="{{ url_for('auth.static', filename='js/registration.js') }}"></script>
+{% endblock %}
+
+{% block form %}
+    <h2>Register</h2>
+    <div id="registration-state" data-open-pin-modal="{{ 'true' if show_pin_modal else 'false' }}"></div>
+    <form method="POST" action="{{ url_for('auth.register') }}">
+        {{ form.hidden_tag() }}
+
+        <div class="form-group">
+            {{ form.username.label(class="field-label") }}
+            {{ form.username(class="field-input") }}
+            {% if form.username.errors %}
+                <div class="field-errors">
+                    {% for error in form.username.errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password.label(class="field-label") }}
+            {{ form.password(class="field-input") }}
+            {% if form.password.errors %}
+                <div class="field-errors">
+                    {% for error in form.password.errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            {{ form.password_confirm.label(class="field-label") }}
+            {{ form.password_confirm(class="field-input") }}
+            {% if form.password_confirm.errors %}
+                <div class="field-errors">
+                    {% for error in form.password_confirm.errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        <div class="auth-actions">
+            {{ form.submit(class="auth-button auth-button-primary") }}
+            <a href="{{ url_for('auth.login') }}" class="auth-button auth-button-secondary">Back to login</a>
+        </div>
+    </form>
+
+    <div id="pin-modal" class="modal" {% if not show_pin_modal %}hidden{% endif %}>
+        <div class="modal-overlay" data-close-pin-modal></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
+            <h3 id="pin-modal-title">Enter Verification PIN</h3>
+            <p class="subtitle">Complete registration by entering your 6-digit PIN.</p>
+
+            <form method="POST" action="{{ url_for('auth.verify_registration_pin') }}">
+                {{ verify_form.hidden_tag() }}
+                <div class="form-group">
+                    {{ verify_form.pin.label(class="field-label") }}
+                    {{ verify_form.pin(class="field-input", inputmode="numeric", pattern="[0-9]*", maxlength="6") }}
+                    {% if verify_form.pin.errors %}
+                        <div class="field-errors">
+                            {% for error in verify_form.pin.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    {{ verify_form.password.label(class="field-label") }}
+                    {{ verify_form.password(class="field-input") }}
+                    {% if verify_form.password.errors %}
+                        <div class="field-errors">
+                            {% for error in verify_form.password.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="auth-actions">
+                    {{ verify_form.submit(class="auth-button auth-button-primary") }}
+                    <button type="button" class="auth-button auth-button-secondary" data-close-pin-modal>Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

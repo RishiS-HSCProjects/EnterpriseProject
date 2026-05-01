@@ -1,0 +1,129 @@
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from app import db
+from ..utils.api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
+from enum import Enum, auto
+
+class User(UserMixin, db.Model):
+    """User model for staff, managers, and admins."""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    xuid = db.Column(db.String(50), unique=True, nullable=False)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
+    def login(self):
+        """Update last login time."""
+        self.last_login_at = db.func.now()
+        from flask_login import login_user
+        login_user(self)
+
+    def set_password(self, password):
+        """Hash and set password."""
+        if not password or len(password) < 8:
+            raise InvalidPassword("Password must be at least 8 characters long.")
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check if password matches hash."""
+        return check_password_hash(self.password_hash, password)
+    
+    @classmethod
+    def get_player_data(cls, username):
+        """Get player data from NetherGames API."""
+        try:
+            response = request(f"players/{username}")
+            if not response:
+                raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+            return response
+        except UnknownPlayer:
+            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+        except MissingAccess:
+            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+        except MaintenanceMode:
+            raise UserNotFound(f"NetherGames API is in maintenance mode. Try again later.")
+        except NetherGamesAPIError as e:
+            raise UserNotFound(f"Failed to fetch player data: {str(e)}")
+
+    @classmethod
+    def validate_user(cls, username):
+        """ Validates: 
+        - User exists in NG API
+        - User has a staff rank OR beta tester rank
+        """
+
+        data = cls.get_player_data(username)
+
+        if (staff := data['staff']) == False:
+            # No staff property? User not found
+            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+
+        if staff or any('tester' in rank.lower() for rank in data.get('ranks', [])):
+            return True
+
+        raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
+    
+    @classmethod
+    def create_user(cls, username, password) -> tuple['User', dict]:
+        """
+        Create a new user if they exist in NG API and have the right ranks.
+        
+        Returns tuple:
+        - 'User' class object
+        - dict of user API data
+        """
+
+        user = cls.query.filter_by(username=username).first()
+        if user:
+            raise UserAlreadyExists(username)
+
+        try:
+            player_data = cls.get_player_data(username)
+            is_staff = bool(player_data.get('staff'))
+            ranks = player_data.get('ranks', [])
+            is_admin = any('admin' in rank.lower() for rank in ranks)
+            is_tester = any('tester' in rank.lower() for rank in ranks)
+
+            if not (is_staff or is_tester):
+                raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
+
+            user = cls()
+            user.xuid = str(player_data.get('xuid'))
+            user.username = username
+            user.role = Roles.ADMIN.value if is_admin else Roles.STAFF.value
+            user.set_password(password)
+            return user, player_data
+        except Exception as exc:
+            db.session.rollback()
+            raise exc
+    
+    def __repr__(self):
+        return f'<User {self.username}>'
+
+class Roles(Enum):
+    STAFF = 0
+    MANAGER = 1
+    ADMIN = 2
+
+class UserExceptionBase(Exception):
+    """Base exception class for User-related errors."""
+    pass
+
+class UserAlreadyExists(UserExceptionBase):
+    """Raised when attempting to create a user that already exists."""
+    def __init__(self, username):
+        super().__init__(f"User with username '{username}' has already registered.")
+
+class UserNotFound(UserExceptionBase):
+    """Raised when a user is not found in the database."""
+    def __init__(self, message = "User not found."):
+        super().__init__(message)
+
+class InvalidPassword(UserExceptionBase):
+    """Raised when an invalid password is provided."""
+    def __init__(self, msg="Invalid password provided."):
+        super().__init__(msg)
