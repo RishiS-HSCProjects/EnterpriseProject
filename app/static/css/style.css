@@ -2,6 +2,13 @@
     --primary: #FF8C00;
     --primary-dark: #E67E00;
     --primary-gradient: linear-gradient(135deg, #FF8C00 0%, #E67E00 100%);
+    --text-on-primary: #1A0E00;
+    --text-on-primary-dark: #ffffff;
+
+    --background: #1a1a1a;
+    --background-card: rgba(26, 26, 26, 0.6);
+    --text-on-background: #fff;
+    --text-on-background-secondary: #eeee;
 }
 
 body {
@@ -12,9 +19,10 @@ body {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-color: #1a1a1a;
-    color: #ffffff;
+    background-color: var(--background);
+    color: var(--text-on-background);
     font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -23,7 +31,6 @@ body::before {
     content: '';
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse at 10% 10%, rgba(138,43,226,0.06), transparent 10%), radial-gradient(ellipse at 90% 80%, rgba(255,45,149,0.03), transparent 8%), rgba(10,10,16,0.5);
     pointer-events: none;
     z-index: -1;
 }
@@ -40,7 +47,7 @@ main {
 footer {
     width: min(1100px, calc(100% - 2rem));
     margin: 0 auto;
-    padding: 1rem 0 1.25rem;
+    padding: 0.9rem 0 0.25rem;
     border-top: 1px solid rgba(138,43,226,0.12);
 }
 
@@ -48,7 +55,7 @@ footer p {
     margin: 0;
     font-size: 0.85rem;
     text-align: center;
-    color: #cccccc;
+    color: var(--text-on-background-secondary);
 }
 
 h1,
@@ -70,6 +77,6 @@ a:hover {
     text-decoration: underline;
 }
 
-.page-content {
+#page-content {
     width: 100%;
 }

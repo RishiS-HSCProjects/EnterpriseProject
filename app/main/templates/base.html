@@ -1,0 +1,37 @@
+{% extends "app-container.html" %}
+
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/base.css') }}">
+{% endblock head %}
+
+{% block content %}
+<aside class="sidebar">
+    <div id="logo">
+        <img src="{{ url_for('static', filename='assets/logo/logo-470x620.png') }}" alt="Logo">
+    </div>
+    <nav>
+        <ul>
+            {% set nav_items = [
+                ('main.dashboard', 'Dashboard'),
+                ('main.schedule', 'Schedule'),
+                ('main.planner', 'Planner')
+            ] %}
+            {% for endpoint, label in nav_items %}
+            <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
+            {% endfor %}
+            {% if current_user.is_admin() %}
+            <li><a href="{{ url_for('main.admin_panel') }}" class="{% if request.endpoint == 'main.admin_panel' %}active{% endif %}">Admin</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <div id="bottom">
+        <div id="account">
+            <p>{{ current_user.username }}</p>
+        </div>
+    </div>
+</aside>
+
+<div id="main" role="main">
+    {% block page_content %}{% endblock page_content %}
+</div>
+{% endblock content %}

@@ -2,7 +2,15 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 from ..utils.api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
-from enum import Enum, auto
+from enum import Enum
+
+class UserRole(Enum):
+    STAFF = 0
+    MANAGER = 1
+    ADMIN = 2
+
+    def __str__(self):
+        return self.name.capitalize()
 
 class User(UserMixin, db.Model):
     """User model for staff, managers, and admins."""
@@ -12,7 +20,7 @@ class User(UserMixin, db.Model):
     xuid = db.Column(db.String(50), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), nullable=False)
+    _role = db.Column(db.String(20), nullable=False, default=UserRole.STAFF.name)
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
     last_login_at = db.Column(db.DateTime, nullable=True)
 
@@ -21,6 +29,22 @@ class User(UserMixin, db.Model):
         self.last_login_at = db.func.now()
         from flask_login import login_user
         login_user(self)
+
+    @property
+    def role(self) -> UserRole:
+        """Get role as a UserRole enum."""
+        try:
+            return UserRole[self._role]
+        except KeyError:
+            return UserRole.STAFF
+    
+    @role.setter
+    def role(self, value: UserRole):
+        """Store the enum name as a string in the database."""
+        if isinstance(value, UserRole):
+            self._role = value.name
+        else:
+            raise ValueError(f"Role must be a UserRole enum, got {type(value)}")
 
     def set_password(self, password):
         """Hash and set password."""
@@ -31,6 +55,12 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         """Check if password matches hash."""
         return check_password_hash(self.password_hash, password)
+    
+    def is_manager(self):
+        return self.role.value >= UserRole.MANAGER.value
+    
+    def is_admin(self):
+        return self.role == UserRole.ADMIN
     
     @classmethod
     def get_player_data(cls, username):
@@ -94,7 +124,7 @@ class User(UserMixin, db.Model):
             user = cls()
             user.xuid = str(player_data.get('xuid'))
             user.username = username
-            user.role = Roles.ADMIN.value if is_admin else Roles.STAFF.value
+            user.role = UserRole.ADMIN if is_admin else UserRole.STAFF
             user.set_password(password)
             return user, player_data
         except Exception as exc:
@@ -103,11 +133,6 @@ class User(UserMixin, db.Model):
     
     def __repr__(self):
         return f'<User {self.username}>'
-
-class Roles(Enum):
-    STAFF = 0
-    MANAGER = 1
-    ADMIN = 2
 
 class UserExceptionBase(Exception):
     """Base exception class for User-related errors."""

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>{% if title %}{{ title }} - {% endif %}NetherGames PLX</title>
+
+    <link rel="shortcut icon" href="{{ url_for('static', filename='assets/logo/favicon_io/favicon.ico') }}" type="image/x-icon">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/form.css') }}">
@@ -26,11 +28,11 @@
         {% endwith %}
     </div>
 
-    <main class="page-content">
+    <main id="page-content">
         {% block content %}{% endblock %}
     </main>
     
-    <footer class="site-footer">
+    <footer>
         <p>&copy; 2026 Enterprise Project | NetherGames Tournament System | <a href="https://github.com/RishiS-HSCProjects/EnterpriseProject/" target="_blank" rel="noreferrer">Open GitHub</a> | Rishi (MegaRabyteYT)</p>
     </footer>
 

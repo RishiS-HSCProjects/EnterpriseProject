@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, render_template, redirect, url_for, session
 import secrets
 from app import db
-from app.models.user import User, UserNotFound, UserAlreadyExists
+from app.models.user import User, UserRole, UserNotFound, UserAlreadyExists
 from app.utils.utils import (
     flash_all_form_errors, flash, save_form_state, restore_form_state
 )
@@ -24,7 +24,7 @@ def login():
             if user and user.check_password(form.password.data):
                 user.login()
                 flash('Login successful.', 'success')
-                return redirect(url_for('auth.login'))
+                return redirect(url_for('main.dashboard'))
             else:
                 add_username_error("Invalid username or password.")
                 flash_all_form_errors(form)
@@ -38,7 +38,7 @@ def login():
     elif form.errors:
         flash_all_form_errors(form)
 
-    return render_template('login.jinja2', form=form)
+    return render_template('login.html', form=form)
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
@@ -64,7 +64,7 @@ def register():
                 'xuid': user.xuid,
                 'username': user.username,
                 'password_hash': user.password_hash,
-                'role': user.role,
+                'role': user.role.name,
                 'hashed_pin': hashpw(pin.encode(), gensalt()).decode('utf-8'),
             }
 
@@ -85,7 +85,7 @@ def register():
             else:
                 add_username_error("No Discord account linked to this user. Please link a Discord account and try again.")
                 flash_all_form_errors(form)
-                return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=False)
+                return render_template('register.html', form=form, verify_form=verify_form, show_pin_modal=False)
 
             flash('Enter the verification PIN to complete registration.', 'warning')
             return redirect(url_for('auth.register'))
@@ -108,7 +108,7 @@ def register():
     elif form.errors:
         flash_all_form_errors(form)
 
-    return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=show_pin_modal)
+    return render_template('register.html', form=form, verify_form=verify_form, show_pin_modal=show_pin_modal)
 
 
 @auth_bp.route('/register/verify-pin', methods=['POST'])
@@ -125,7 +125,7 @@ def verify_registration_pin():
 
     if not verify_form.validate_on_submit():
         flash_all_form_errors(verify_form)
-        return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
+        return render_template('register.html', form=form, verify_form=verify_form, show_pin_modal=True)
 
     from bcrypt import checkpw
     from werkzeug.security import check_password_hash
@@ -164,7 +164,7 @@ def verify_registration_pin():
 
         verify_form.pin.errors = [*verify_form.pin.errors, 'Incorrect PIN. Please try again.']
         flash_all_form_errors(verify_form)
-        return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
+        return render_template('register.html', form=form, verify_form=verify_form, show_pin_modal=True)
 
     existing_user = User.query.filter_by(username=pending.get('username')).first()
     if existing_user:
@@ -175,13 +175,13 @@ def verify_registration_pin():
     user = User()
     user.xuid = pending.get('xuid')
     user.username = pending.get('username')
-    user.role = pending.get('role')
+    user.role = UserRole[pending.get('role', 'STAFF')]
     user.password_hash = pending.get('password_hash')
 
     if not user.check_password(verify_form.password.data):
         verify_form.password.errors = [*verify_form.password.errors, 'Incorrect password. Please try again.']
         flash_all_form_errors(verify_form)
-        return render_template('register.jinja2', form=form, verify_form=verify_form, show_pin_modal=True)
+        return render_template('register.html', form=form, verify_form=verify_form, show_pin_modal=True)
 
     db.session.add(user)
     db.session.commit()
