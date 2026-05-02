@@ -1,8 +1,30 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard{% endblock %}
+{% set title = "Dashboard" %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/dashboard.css') }}">
+{% endblock %}
 
 {% block page_content %}
-    <h1>Dashboard</h1>
-    <p>Welcome to your dashboard!</p>
+    <hr>
+    <div id="kpi-panel">
+        {% for kpi in kpis %}
+        {{ kpi_macro(title=kpi.title, value=kpi.value, unit=kpi.unit, hover_text=kpi.hover_text) }}
+        {% endfor %}
+    </div>
+    <hr>
 {% endblock %}
+
+{% macro kpi_macro(title, value, unit, hover_text) %}
+<div class="kpi-card" title="{{ hover_text }}">
+    <h3>{{ title }}</h3>
+    <div class="kpi-value">
+        <span class="value-wrap">
+            <span class="value">{{ value }}</span>
+            <sup class="unit">{{ unit }}</sup>
+        </span>
+    </div>
+</div>
+{% endmacro %}

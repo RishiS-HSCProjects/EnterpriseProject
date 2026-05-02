@@ -16,6 +16,7 @@ aside {
     background-color: var(--background-card);
     border-radius: 8px;
     display: flex;
+    overflow: auto;
     flex-direction: column;
 }
 
@@ -87,4 +88,11 @@ aside #bottom p:hover {
     margin-left: 1rem;
     background-color: var(--background-card);
     border-radius: 8px;
+    overflow: auto;
+}
+
+#main h1 {
+    margin-top: 0;
+    color: var(--primary);
+    font-size: 3rem;
 }

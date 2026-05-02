@@ -14,7 +14,6 @@
             {% set nav_items = [
                 ('main.dashboard', 'Dashboard'),
                 ('main.schedule', 'Schedule'),
-                ('main.planner', 'Planner')
             ] %}
             {% for endpoint, label in nav_items %}
             <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
@@ -32,6 +31,7 @@
 </aside>
 
 <div id="main" role="main">
+    <h1>{{ title }}</h1>
     {% block page_content %}{% endblock page_content %}
 </div>
 {% endblock content %}

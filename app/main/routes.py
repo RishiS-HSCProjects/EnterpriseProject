@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from flask import Blueprint, render_template, redirect, url_for
 from flask_login import current_user
 
@@ -8,15 +10,25 @@ def dashboard():
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))
 
-    return render_template('dashboard.html')
+    @dataclass
+    class KPI:
+        title: str
+        value: str
+        unit: str = ""
+        hover_text: str = ""
+
+    # Placeholder KPIs
+    kpis = [
+        KPI(title="Days till next tournament", value="12", unit="days", hover_text="Number of tournaments hosted"),
+        KPI(title="Active Players", value="350", unit="players", hover_text="Number of active players"),
+        KPI(title="Upcoming Events", value="3", unit="events", hover_text="Tournaments scheduled in the next month")
+    ]
+
+    return render_template('dashboard.html', kpis=kpis)
 
 @main_bp.route('/schedule')
 def schedule():
     return 'Schedule page - Coming Soon!'
-
-@main_bp.route('/planner')
-def planner():
-    return 'Planner page - Coming Soon!'
 
 @main_bp.route('/admin')
 def admin_panel():
