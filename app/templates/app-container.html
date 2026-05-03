@@ -16,6 +16,9 @@
 </head>
 
 <body>
+    <div id="loader-container" hidden>
+        <div id="loader"></div>
+    </div>
     <div id="flash-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -38,6 +41,8 @@
 
     <script src="{{ url_for('static', filename='js/background.js') }}"></script>
     <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/loader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal_utils.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

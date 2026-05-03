@@ -15,4 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const shouldOpenModal = state.dataset.openPinModal === 'true';
 
     initializeModal(modal, shouldOpenModal, pinInput);
+
+    if (shouldOpenModal) stopLoader();
 });

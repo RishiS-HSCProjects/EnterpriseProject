@@ -8,13 +8,14 @@
 {% endblock %}
 
 {% block page_content %}
-    <hr>
+    {% if kpis %}
     <div id="kpi-panel">
         {% for kpi in kpis %}
         {{ kpi_macro(title=kpi.title, value=kpi.value, unit=kpi.unit, hover_text=kpi.hover_text) }}
         {% endfor %}
     </div>
     <hr>
+    {% endif %}
 {% endblock %}
 
 {% macro kpi_macro(title, value, unit, hover_text) %}

@@ -7,7 +7,7 @@
  * @param {HTMLElement} modal - The modal element to open
  * @param {HTMLElement} [focusElement] - Optional element to focus after opening
  */
-export function openModal(modal, focusElement) {
+function openModal(modal, focusElement) {
     modal.hidden = false;
     if (focusElement) {
         focusElement.focus();
@@ -18,7 +18,7 @@ export function openModal(modal, focusElement) {
  * Closes a modal by hiding it
  * @param {HTMLElement} modal - The modal element to close
  */
-export function closeModal(modal) {
+function closeModal(modal) {
     modal.hidden = true;
 }
 
@@ -27,7 +27,7 @@ export function closeModal(modal) {
  * @param {HTMLElement} modal - The modal element
  * @param {HTMLElement} [focusElement] - Optional element to focus when opening
  */
-export function setupModalListeners(modal, focusElement) {
+function setupModalListeners(modal, focusElement) {
     const handleCloseModal = () => closeModal(modal);
 
     // Add click listeners to all close buttons
@@ -49,7 +49,7 @@ export function setupModalListeners(modal, focusElement) {
  * @param {boolean} shouldOpen - Whether to automatically open the modal
  * @param {HTMLElement} [focusElement] - Optional element to focus
  */
-export function initializeModal(modal, shouldOpen, focusElement) {
+function initializeModal(modal, shouldOpen, focusElement) {
     setupModalListeners(modal, focusElement);
 
     if (shouldOpen) {

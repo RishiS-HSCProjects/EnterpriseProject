@@ -18,7 +18,7 @@ class ChannelWebhookUrl(Enum):
         value = os.getenv(mapping[self])
 
         if value is None:
-            raise TypeError("Webhook URL Type does not exist.")
+            raise WebhookUrlNotFound(f"Webhook URL for {self.name} not found.")
 
         return value
 
@@ -57,11 +57,27 @@ def send(
 
         response = webhook.execute()
         return response.status_code in (200, 204)
-    except TypeError as exc:
-        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
+    except WebhookUrlNotFound as exc:
+        current_app.logger.error("Webhook URL not found: %s", exc)
+        raise
+    except InvalidWebhookUrlType as exc:
         current_app.logger.error("Invalid webhook URL type provided: %s", exc)
-        return False
+        raise
+    except WebhookSendError as exc:
+        current_app.logger.error("Failed to send message to Discord webhook: %s", exc)
+        raise
     except Exception as exc:
-        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
         current_app.logger.exception("error sending message to Discord webhook: %s", exc)
-        return False
+        raise
+
+class WebhookError(Exception):
+    """Custom exception for webhook-related errors."""
+
+class WebhookUrlNotFound(WebhookError):
+    """Raised when a required webhook URL is not found in environment variables."""
+
+class WebhookSendError(WebhookError):
+    """Raised when sending a message to the webhook fails."""
+
+class InvalidWebhookUrlType(WebhookError):
+    """Raised when an invalid webhook URL type is provided."""

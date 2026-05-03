@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from flask import Blueprint, render_template, redirect, url_for
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 main_bp = Blueprint("main", __name__, template_folder="templates", static_folder="static", static_url_path="/main/static")
 
@@ -26,11 +26,13 @@ def dashboard():
 
     return render_template('dashboard.html', kpis=kpis)
 
-@main_bp.route('/schedule')
-def schedule():
-    return 'Schedule page - Coming Soon!'
+@main_bp.route('/scheduler')
+@login_required
+def scheduler():
+    return render_template('scheduler.html')
 
 @main_bp.route('/admin')
+@login_required
 def admin_panel():
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login'))

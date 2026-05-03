@@ -80,3 +80,49 @@ a:hover {
 #page-content {
     width: 100%;
 }
+
+#loader-container[hidden] {
+    display: none;
+}
+
+#loader-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.55);
+    z-index: 9999;
+    pointer-events: all; /* prevent interaction with the page underneath */
+}
+
+/* centered square panel that uses theme background */
+#loader-container #loader {
+    width: min(300px, 30vmin);
+    height: min(300px, 30vmin);
+    background-color: var(--background);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    position: relative;
+    padding: 1rem;
+}
+
+/* spinner ring rendered via pseudo-element so the panel stays square */
+#loader-container #loader::before {
+    content: '';
+    width: 120px;
+    height: 120px;
+    border: 12px solid rgba(255, 140, 0, 0.18);
+    border-top: 12px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1.6s linear infinite;
+    box-sizing: border-box;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

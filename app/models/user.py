@@ -1,3 +1,5 @@
+from glob import escape
+from flask import current_app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
@@ -68,16 +70,17 @@ class User(UserMixin, db.Model):
         try:
             response = request(f"players/{username}")
             if not response:
-                raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+                raise UserNotFound(f"User with username '{username}' not found in the NetherGames API.")
             return response
         except UnknownPlayer:
-            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+            raise UserNotFound(f"User with username '{username}' not found in the NetherGames API.")
         except MissingAccess:
-            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
+            raise UserNotFound(f"User with username '{username}' not found in the NetherGames API.")
         except MaintenanceMode:
             raise UserNotFound(f"NetherGames API is in maintenance mode. Try again later.")
         except NetherGamesAPIError as e:
-            raise UserNotFound(f"Failed to fetch player data: {str(e)}")
+            current_app.logger.error(f"Error fetching player data for '{username}': {e}")
+            raise UserNotFound(f"Failed to fetch player data.")
 
     @classmethod
     def validate_user(cls, username):
@@ -107,6 +110,7 @@ class User(UserMixin, db.Model):
         - dict of user API data
         """
 
+        username = escape(username.strip())
         user = cls.query.filter_by(username=username).first()
         if user:
             raise UserAlreadyExists(username)
@@ -132,11 +136,10 @@ class User(UserMixin, db.Model):
             raise exc
     
     def __repr__(self):
-        return f'<User {self.username}>'
+        return f'<User {self.username} ({self.role})>'
 
 class UserExceptionBase(Exception):
     """Base exception class for User-related errors."""
-    pass
 
 class UserAlreadyExists(UserExceptionBase):
     """Raised when attempting to create a user that already exists."""

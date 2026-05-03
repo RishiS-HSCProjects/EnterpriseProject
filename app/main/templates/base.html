@@ -13,7 +13,7 @@
         <ul>
             {% set nav_items = [
                 ('main.dashboard', 'Dashboard'),
-                ('main.schedule', 'Schedule'),
+                ('main.scheduler', 'Scheduler'),
             ] %}
             {% for endpoint, label in nav_items %}
             <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
@@ -32,6 +32,7 @@
 
 <div id="main" role="main">
     <h1>{{ title }}</h1>
+    <hr>
     {% block page_content %}{% endblock page_content %}
 </div>
 {% endblock content %}

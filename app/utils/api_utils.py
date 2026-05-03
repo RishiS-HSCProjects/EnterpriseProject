@@ -57,7 +57,14 @@ class MaintenanceMode(NetherGamesAPIError):
     """Code 50001: Maintenance Mode."""
     pass
 
-# Map error codes to exception classes
+HTTP_ERROR_MAP = {
+    404: UnknownPlayer,
+    400: NetherGamesAPIError,
+    401: MissingAccess,
+    403: MissingAccess,
+    500: MaintenanceMode,
+}
+
 ERROR_CODE_MAP = {
     0: GeneralError,
     10005: UnknownFaction,
@@ -82,26 +89,22 @@ def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
         'Authorization': API_KEY,
         'Content-Type': 'application/json'
     }
+
     response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT, headers=headers)
 
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        raise NetherGamesAPIError(
-            f"NetherGames API request failed: {response.status_code}"
-        ) from exc
+    if response.status_code in HTTP_ERROR_MAP:
+        exc = HTTP_ERROR_MAP[response.status_code]
+        raise exc(f"HTTP {response.status_code}")
 
     try:
         data = response.json()
     except ValueError as exc:
         raise NetherGamesAPIError("NetherGames API returned invalid JSON.") from exc
 
-    # Check for error codes in response
-    if isinstance(data, dict) and 'code' in data:
-        error_code = data.get('code')
-        error_message = data.get('message', 'Unknown error')
-
-        exception_class = ERROR_CODE_MAP.get(error_code, NetherGamesAPIError) # type: ignore
-        raise exception_class(error_message)
+    if isinstance(data, dict) and "code" in data:
+        error_code = data["code"]
+        error_message = data.get("message", "Unknown error")
+        exc = ERROR_CODE_MAP.get(error_code, NetherGamesAPIError)
+        raise exc(error_message)
 
     return data
