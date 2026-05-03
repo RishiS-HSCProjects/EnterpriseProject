@@ -10,13 +10,25 @@ document.addEventListener("DOMContentLoaded", () => {
         event.preventDefault();
         handlePinSubmit();
     });
+
+    // Wire up pin modal using centralized helper if available
+    const regState = document.getElementById('registration-state');
+    const autoOpen = regState && regState.dataset.openPinModal === 'true';
+    if (typeof setupFormModal === 'function') {
+        setupFormModal({
+            modalId: 'pin-modal',
+            formId: 'pin-form',
+            focusSelector: 'input[name="pin"]',
+            autoOpen: autoOpen
+        });
+    }
 });
 
 function handleVerificationSubmit() {
     startLoader();
 
     const form = document.getElementById("register-form");
-    const formData = new FormData(form);   // includes CSRF token automatically
+    const formData = new FormData(form);
 
     fetch("/register/handle/pin", {
         method: "POST",
@@ -45,9 +57,11 @@ function handleVerificationSubmit() {
 
         if (data.message) console.log("Server message:", data.message);
 
-        // Show modal
+        // Show modal (use central helper openModal if available)
         const modal = document.getElementById("pin-modal");
-        modal.removeAttribute("hidden");
+        const pinInput = modal ? modal.querySelector('input[name="pin"]') : null;
+        if (typeof openModal === 'function' && modal) openModal(modal, pinInput);
+        else if (modal) modal.removeAttribute("hidden");
         return;
     })
         .catch(error => {

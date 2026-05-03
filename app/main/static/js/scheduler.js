@@ -3,29 +3,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!modal) return;
 
     const shouldOpenModal = modal.dataset.showAddModal === 'true';
-    const firstField = modal.querySelector('input[type="text"]');
 
-    initializeModal(modal, shouldOpenModal, firstField);
-
-    if (shouldOpenModal) {
-        modal.removeAttribute('hidden');
-        if (firstField) firstField.focus();
-    }
-
-    const openBtn = document.querySelector('.create-tournament-btn');
-    if (openBtn) {
-        openBtn.addEventListener('click', () => {
-            modal.removeAttribute('hidden');
-            if (firstField) firstField.focus();
-        });
-    }
-
-    const closeBtn = modal.querySelector('#close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', () => {
-            modal.setAttribute('hidden', '');
-        });
-    }
+    // Wire modal using centralized helper
+    setupFormModal({
+        modalId: 'add-modal',
+        openButtonSelector: '.create-tournament-btn',
+        formId: 'add-tournament-form',
+        focusSelector: 'input[type="text"]',
+        autoOpen: shouldOpenModal
+    });
 
     // Convert any displayed datetimes (with class 'dt' and data-unix) into local timezone strings
     function relativeTime(dt) {

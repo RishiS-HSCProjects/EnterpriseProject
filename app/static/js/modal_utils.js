@@ -30,9 +30,14 @@ function closeModal(modal) {
 function setupModalListeners(modal, focusElement) {
     const handleCloseModal = () => closeModal(modal);
 
-    // Add click listeners to all close buttons
-    modal.querySelectorAll('[data-close-pin-modal]').forEach(function(element) {
+    // Add click listeners to common close attributes (backwards compatible)
+    modal.querySelectorAll('[data-close-modal], [data-close-pin-modal]').forEach(function(element) {
         element.addEventListener('click', handleCloseModal);
+    });
+
+    // If modal overlay exists, clicking it should close the modal
+    modal.querySelectorAll('.modal-overlay').forEach(function(el) {
+        el.addEventListener('click', handleCloseModal);
     });
 
     // Add escape key listener
@@ -56,3 +61,42 @@ function initializeModal(modal, shouldOpen, focusElement) {
         openModal(modal, focusElement);
     }
 }
+
+/**
+ * Convenience helper to wire up a form inside a modal and an open button.
+ * Options:
+ * - modalId (string): id of the modal element
+ * - openButtonSelector (string): selector for the button that opens the modal (optional)
+ * - formId (string): id of the form inside the modal (optional)
+ * - focusSelector (string): selector for element to focus when opened (optional)
+ * - autoOpen (boolean): if true, open immediately
+ */
+function setupFormModal({modalId, openButtonSelector, formId, focusSelector, autoOpen}) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return null;
+
+    let focusElement = null;
+    if (focusSelector) {
+        focusElement = modal.querySelector(focusSelector) || document.querySelector(focusSelector);
+    }
+    if (!focusElement && formId) {
+        const form = modal.querySelector(`#${formId}`) || document.getElementById(formId);
+        if (form) focusElement = form.querySelector('input, select, textarea');
+    }
+
+    initializeModal(modal, !!autoOpen, focusElement);
+
+    if (openButtonSelector) {
+        document.querySelectorAll(openButtonSelector).forEach(btn => {
+            btn.addEventListener('click', () => openModal(modal, focusElement));
+        });
+    }
+
+    return { modal, focusElement };
+}
+
+// expose helpers
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.initializeModal = initializeModal;
+window.setupFormModal = setupFormModal;
