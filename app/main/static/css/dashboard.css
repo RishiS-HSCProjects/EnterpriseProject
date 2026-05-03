@@ -47,14 +47,12 @@
     align-items: center;
 }
 
-/* Wrap around the number */
 #kpi-panel .kpi-card .kpi-value .value-wrap {
-    position: relative;
-    display: inline-block;
-    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-/* Main KPI value */
 #kpi-panel .kpi-card .kpi-value .value-wrap .value {
     font-size: clamp(2rem, 6vw, 5rem);
     font-weight: bold;
@@ -62,14 +60,8 @@
     color: var(--text-on-primary);
 }
 
-/* Unit */
 #kpi-panel .kpi-card .kpi-value .value-wrap .unit {
-    position: absolute;
-    top: 0;
-    left: 100%;
-    margin-left: 0.1rem;
-    font-size: 0.5rem;
+    font-size: 0.75rem;
     line-height: 1;
     color: var(--text-on-primary);
-    transform: translateX(min(0px, calc(100% - 1rem - 100%)));
 }

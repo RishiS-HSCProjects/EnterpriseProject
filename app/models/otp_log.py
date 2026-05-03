@@ -18,7 +18,7 @@ class OtpLog(db.Model):
 
         hashed_code = hashpw(otp_code.encode(), gensalt()).decode('utf-8')
 
-        otp_log = OtpLog(xuid=xuid, hashed_otp_code=hashed_code, ip_address=ip_address)
+        otp_log = OtpLog(xuid=xuid, hashed_otp_code=hashed_code, ip_address=ip_address) # type: ignore
         db.session.add(otp_log)
         db.session.commit()
 

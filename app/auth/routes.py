@@ -57,7 +57,7 @@ def handle_registration_pin():
 
     form = RegistrationForm()
 
-    session.pop('pending_registration')
+    session.pop('pending_registration', None)
 
     def add_username_error(message: str) -> None:
         form.username.errors = [*form.username.errors, message]
@@ -98,7 +98,7 @@ def handle_registration_pin():
     from app.auth.utils.verification_utils import send_verification_pin, TooManyAttempts, SuspiciousActivity
     from app.utils.discord_webhook_utils import WebhookError
     try:
-        send_verification_pin(user, discord_id=discord_id, request_ip=request.remote_addr)
+        send_verification_pin(user, discord_id=discord_id, request_ip=request.remote_addr) # type: ignore
     except WebhookError as exc:
         current_app.logger.error(f"Webhook error during PIN sending: {exc}")
         flash('An error occurred while sending the verification PIN. Please contact an administrator.', 'error')
@@ -114,7 +114,7 @@ def handle_registration_pin():
         flash('An unexpected error occurred while sending the verification PIN. Please try again later.', 'error')
         return fail(500)
 
-    return jsonify({"message": user.__repr__()}), 200
+    return jsonify({}), 200
 
 @auth_bp.route('/register/verify/pin', methods=['POST'])
 def verify_registration_pin():
@@ -136,7 +136,7 @@ def verify_registration_pin():
 
     from app.models.otp_log import OtpLog, OtpLogNotFound, OtpLogExpired, OtpLogInvalidIp
     try:
-        otp_verify = OtpLog.verify_otp(pending.get('xuid'), verify_form.pin.data, request.remote_addr)
+        otp_verify = OtpLog.verify_otp(pending.get('xuid'), verify_form.pin.data, request.remote_addr) # type: ignore
     except OtpLogNotFound as exc:
         verify_form.pin.errors = [*verify_form.pin.errors, str(exc)]
         return fail()
@@ -174,6 +174,6 @@ def verify_registration_pin():
 
     db.session.add(user)
     db.session.commit()
-    session.pop('pending_registration')
+    session.pop('pending_registration', None)
     flash('Registration successful. You can now log in.', 'success')
     return jsonify({"status": "success"}), 200

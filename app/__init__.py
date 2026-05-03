@@ -2,11 +2,13 @@ import os
 from flask import Flask
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from dotenv import load_dotenv
 
 load_dotenv()
 
 db = SQLAlchemy()
+migrate = None # Placeholder for Flask-Migrate instance, to be initialized in app factory
 login_manager = LoginManager()
 login_manager.login_view = 'auth.login' # type: ignore
 login_manager.login_message_category = 'info'
@@ -43,6 +45,8 @@ def create_app():
     app.config.from_object(Config)
     
     db.init_app(app)
+    global migrate
+    migrate = Migrate(app, db)
     login_manager.init_app(app)
     
     with app.app_context():

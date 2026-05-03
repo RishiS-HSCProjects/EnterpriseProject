@@ -47,7 +47,7 @@ def verify_request(xuid: str, request_ip: str) -> None:
     distinct_xuids = set(log.xuid for log in recent_ip_logs)
     # If this IP has attempted to set up more than 3 different accounts, block
     if len(distinct_xuids) >= 3:
-        blocked_ip = BlockedIp(ip_address=request_ip, reason=BlockedIp.REASON_TOO_MANY_ATTEMPTS)
+        blocked_ip = BlockedIp(ip_address=request_ip, reason=BlockedIp.REASON_TOO_MANY_ATTEMPTS) # type: ignore
         from app import db
         db.session.add(blocked_ip)
         db.session.commit()

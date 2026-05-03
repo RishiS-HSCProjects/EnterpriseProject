@@ -40,7 +40,7 @@ def serialize_form_errors(form):
     return error_dict
 
 
-def repopulate_form(form, form_data=None, form_errors=None):
+def _repopulate_form(form, form_data=None, form_errors=None):
     """Repopulate form with serialized data and errors from session.
     
     Args:
@@ -125,7 +125,7 @@ def restore_form_state(form, prefix=''):
             flash_form_errors(form, form_errors)
         
         # Repopulate form
-        form = repopulate_form(form, form_data, form_errors)
+        form = _repopulate_form(form, form_data, form_errors)
     
     return form
 
