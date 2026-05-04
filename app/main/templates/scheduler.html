@@ -65,11 +65,12 @@
                 {% endif %}
             </div>
 
-            <!-- Start (unix seconds) -->
+            <!-- Start Date Picker (UTC Midnight) -->
             <div class="form-group">
-                {{ add_form.start_unix.label(class="field-label") }}
-                {{ add_form.start_unix(class="field-input", id="start-unix-input") }}
+                <label class="field-label">Start Date (UTC Midnight)</label>
+                <input type="date" id="start-date-picker" class="field-input" />
                 <div class="time-preview" id="start-preview"></div>
+                {{ add_form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
                 {% if add_form.start_unix.errors %}
                     <div class="field-errors">
                         {% for error in add_form.start_unix.errors %}
@@ -79,11 +80,12 @@
                 {% endif %}
             </div>
 
-            <!-- End (unix seconds) -->
+            <!-- End Date Picker (UTC Midnight) -->
             <div class="form-group">
-                {{ add_form.end_unix.label(class="field-label") }}
-                {{ add_form.end_unix(class="field-input", id="end-unix-input") }}
+                <label class="field-label">End Date (UTC Midnight)</label>
+                <input type="date" id="end-date-picker" class="field-input" />
                 <div class="time-preview" id="end-preview"></div>
+                {{ add_form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
                 {% if add_form.end_unix.errors %}
                     <div class="field-errors">
                         {% for error in add_form.end_unix.errors %}
@@ -96,7 +98,8 @@
             <!-- Round Count -->
             <div class="form-group">
                 {{ add_form.round_count.label(class="field-label") }}
-                {{ add_form.round_count(class="field-input") }}
+                {{ add_form.round_count(class="field-input", id="round-count-input") }}
+                <div class="time-preview" id="round-duration-preview"></div>
                 {% if add_form.round_count.errors %}
                     <div class="field-errors">
                         {% for error in add_form.round_count.errors %}
@@ -119,6 +122,74 @@
                 {% endif %}
             </div>
 
+            <!-- Prizes -->
+            <div class="form-group">
+                {{ add_form.round_first_prize.label(class="field-label") }}
+                {{ add_form.round_first_prize(class="field-input") }}
+                {% if add_form.round_first_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_first_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.round_second_prize.label(class="field-label") }}
+                {{ add_form.round_second_prize(class="field-input") }}
+                {% if add_form.round_second_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_second_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.round_third_prize.label(class="field-label") }}
+                {{ add_form.round_third_prize(class="field-input") }}
+                {% if add_form.round_third_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_third_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_first_prize.label(class="field-label") }}
+                {{ add_form.global_first_prize(class="field-input") }}
+                {% if add_form.global_first_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_first_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_second_prize.label(class="field-label") }}
+                {{ add_form.global_second_prize(class="field-input") }}
+                {% if add_form.global_second_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_second_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_third_prize.label(class="field-label") }}
+                {{ add_form.global_third_prize(class="field-input") }}
+                {% if add_form.global_third_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_third_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
             <!-- Actions -->
             <div class="auth-actions">
                 {{ add_form.submit(class="auth-button auth-button-primary") }}
@@ -135,8 +206,8 @@
 {% macro tournament_item(tournaments, status) %}
 <div class="tournament-list">
     {% for t in tournaments %}
-    <div class="tournament-row status-{{ status }}">
-        <div class="tournament-row-left">
+    <div class="tournament-row status-{{ status }}" onclick="window.location='{{ url_for('main.tournament_editor', tournament_id=t.id) }}'">
+        <a class="tournament-row-left" href="{{ url_for('main.tournament_editor', tournament_id=t.id) }}">
             <div class="tournament-name">{{ t.name }}</div>
 
             <div class="tournament-dates">
@@ -144,7 +215,7 @@
                 <span class="separator">→</span>
                 <span class="dt" data-unix="{{ t.end_unix }}">{{ t.end_datetime.strftime('%d %B %H:%M') }}</span>
             </div>
-        </div>
+        </a>
 
         <div class="tournament-row-right">
             <div>{{ t.round_count }} rounds</div>

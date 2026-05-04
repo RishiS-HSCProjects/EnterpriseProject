@@ -1,8 +1,7 @@
 import os
 from enum import Enum, auto
-from discord_webhook import DiscordEmbed, DiscordWebhook
+from discord_webhook import DiscordWebhook
 from flask import current_app
-from .utils import flash
 
 class ChannelWebhookUrl(Enum):
     SECURE_WEBHOOK_URL = auto()
@@ -24,20 +23,15 @@ class ChannelWebhookUrl(Enum):
 
 def send(
     location: ChannelWebhookUrl,
-    content: str,
+    content: str | None = None,
     username: str = "Enterprise Project Bot",
     header: str | None = None,
-    embeds: list[DiscordEmbed] | None = None,
     timeout: int = 10,
 ) -> bool:
     """Send a message to a Discord webhook channel.
 
     Returns True on success, otherwise False.
     """
-
-    if content is None:
-        current_app.logger.warning("No content provided to Discord webhook send()")
-        return False
 
     message_content = content
     if header:
@@ -51,24 +45,46 @@ def send(
             timeout=timeout,
         )
 
-        if embeds:
-            for embed in embeds:
-                webhook.add_embed(embed)
-
         response = webhook.execute()
         return response.status_code in (200, 204)
     except WebhookUrlNotFound as exc:
         current_app.logger.error("Webhook URL not found: %s", exc)
         raise
-    except InvalidWebhookUrlType as exc:
-        current_app.logger.error("Invalid webhook URL type provided: %s", exc)
-        raise
-    except WebhookSendError as exc:
-        current_app.logger.error("Failed to send message to Discord webhook: %s", exc)
-        raise
     except Exception as exc:
         current_app.logger.exception("error sending message to Discord webhook: %s", exc)
         raise
+
+
+def format_placement_lines(entries, label: str = 'kills') -> str:
+    """Format leaderboard entries as markdown lines.
+    
+    Args:
+        entries: List of leaderboard entry objects with .player and .score attributes
+        label: Label for the score (default: 'kills')
+    
+    Returns:
+        Formatted markdown string with numbered placement lines
+    """
+    lines = []
+    for index, entry in enumerate(entries, start=1):
+        lines.append(f"- **{index}. {entry.player}: {entry.score} {label}**")
+    return "\n".join(lines) if lines else "- No data available."
+
+def format_prize_lines(prizes: dict[str, str]) -> str:
+    """Format prize dictionary as markdown lines.
+    
+    Args:
+        prizes: Dict with keys 'first', 'second', 'third'
+    
+    Returns:
+        Formatted markdown string with prize placements
+    """
+    return (
+        f"- **1st:** {prizes.get('first', 'TBA')}\n"
+        f"- **2nd:** {prizes.get('second', 'TBA')}\n"
+        f"- **3rd:** {prizes.get('third', 'TBA')}"
+    )
+
 
 class WebhookError(Exception):
     """Custom exception for webhook-related errors."""

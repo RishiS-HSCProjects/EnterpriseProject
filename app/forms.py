@@ -1,4 +1,3 @@
-from datetime import datetime, UTC
 from flask_wtf import FlaskForm
 from wtforms import IntegerField, StringField, PasswordField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Length, EqualTo, NumberRange, Regexp, ValidationError
@@ -37,28 +36,24 @@ class AddTournamentForm(FlaskForm):
     end_unix = IntegerField('End (Unix epoch seconds)', validators=[DataRequired()])
     round_count = IntegerField('Number of Rounds', validators=[DataRequired(), NumberRange(min=1)])
     discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=2000)])
-    submit = SubmitField('Create Tournament')
+    round_first_prize = StringField('Round First Place Prize', validators=[DataRequired(), Length(max=100)])
+    round_second_prize = StringField('Round Second Place Prize', validators=[DataRequired(), Length(max=100)])
+    round_third_prize = StringField('Round Third Place Prize', validators=[DataRequired(), Length(max=100)])
+    global_first_prize = StringField('Global First Place Prize', validators=[DataRequired(), Length(max=100)])
+    global_second_prize = StringField('Global Second Place Prize', validators=[DataRequired(), Length(max=100)])
+    global_third_prize = StringField('Global Third Place Prize', validators=[DataRequired(), Length(max=100)])
+    submit = SubmitField('Save')
 
     def validate_start_unix(self, field):
         if self.end_unix.data and field.data >= self.end_unix.data:
             raise ValidationError('Start time must be before end time')
 
-        from app.models import Tournament
-        if tourney := (Tournament.query.filter(
-            Tournament.start_unix < self.end_unix.data
-        ).first()):
-            raise ValidationError(f'Time overlap: This tournament starts before the {tourney.name} ends (unix {tourney.end_unix}).')
-
-
     def validate_end_unix(self, field):
-        if self.start_unix.data and field.data and field.data <= self.start_unix.data:
-            raise ValidationError('End time must be after start time')
+        if not field.data or not self.start_unix.data:
+            return
 
-        from app.models import Tournament
-        if tourney := (Tournament.query.filter(
-            Tournament.end_unix > self.start_unix.data
-        ).first()):
-            raise ValidationError(f'Time overlap: This tournament ends after the {tourney.name} starts (unix {tourney.start_unix}).')
+        if field.data <= self.start_unix.data:
+            raise ValidationError('End time must be after start time')
 
     def validate_round_count(self, field):
         if field.data < 1:

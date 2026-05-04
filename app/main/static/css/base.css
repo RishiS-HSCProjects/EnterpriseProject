@@ -88,7 +88,6 @@ aside #bottom p:hover {
     margin-left: 1rem;
     background-color: var(--background-card);
     border-radius: 8px;
-    overflow: auto;
 }
 
 #main h1 {

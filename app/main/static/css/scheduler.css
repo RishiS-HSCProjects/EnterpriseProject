@@ -172,6 +172,43 @@
     box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.25);
 }
 
+/* Date picker styling */
+#scheduler-page input[type="date"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.75rem;
+
+    background: var(--background);
+    color: var(--text-on-background);
+
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+
+    font-size: 1rem;
+    line-height: 1.4;
+
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scheduler-page input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.25);
+}
+
+/* Style the date picker calendar icon */
+#scheduler-page input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+}
+
+#scheduler-page .time-preview {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-on-background-secondary);
+    min-height: 1.2em;
+}
+
 #scheduler-page .field-errors {
     margin-top: 0.35rem;
     color: var(--danger);

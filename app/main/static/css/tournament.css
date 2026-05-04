@@ -1,0 +1,165 @@
+.editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    align-items: start;
+}
+
+.editor-left,
+.editor-right {
+    background: var(--background-card);
+    color: var(--text-on-background);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.editor-left {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.editor-left form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.field-label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.field-input,
+.field-textarea {
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: transparent;
+    color: var(--text-on-background);
+}
+
+select.field-input {
+    background-color: rgba(26, 26, 26, 0.92);
+    color: var(--text-on-background);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 2rem;
+    cursor: pointer;
+}
+
+select.field-input option {
+    background-color: var(--background);
+    color: var(--text-on-background);
+}
+
+select.field-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.15);
+}
+
+.field-textarea {
+    min-height: 100px;
+}
+
+.form-group {
+    margin-bottom: 12px;
+}
+
+.time-info {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 6px 0 0 0;
+    padding: 6px 8px;
+    background: rgba(255, 140, 0, 0.05);
+    border-left: 2px solid var(--primary);
+    border-radius: 3px;
+}
+
+.auth-actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.auth-actions:last-of-type {
+    margin-top: auto;
+}
+
+.auth-button.auth-button-primary {
+    background: var(--primary);
+    color: var(--text-on-primary-dark);
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.auth-button.auth-button-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+}
+
+.auth-button.auth-button-primary:disabled,
+.auth-button.auth-button-secondary:disabled {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.08);
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    opacity: 1;
+}
+
+.auth-button.auth-button-primary:disabled:hover,
+.auth-button.auth-button-secondary:disabled:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+    transform: none;
+}
+
+.auth-button.auth-button-secondary {
+    background: transparent;
+    color: var(--text-on-background);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.auth-button.auth-button-secondary:hover {
+    border-color: rgba(255, 140, 0, 0.5);
+    color: var(--primary);
+}
+
+.leaderboard-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.leaderboard-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    display: flex;
+    justify-content: space-between;
+}
+
+@media (max-width: 800px) {
+    .editor-grid {
+        grid-template-columns: 1fr;
+    }
+}
