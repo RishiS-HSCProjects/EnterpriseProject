@@ -16,6 +16,12 @@
 </head>
 
 <body>
+    <div id="background-controller"
+        data-day="/static/assets/default-background-day.webp"
+        data-night="/static/assets/default-background-night.webp"
+        data-wait-for-load>
+    </div>
+
     <div id="loader-container" hidden>
         <div id="loader"></div>
     </div>
@@ -43,6 +49,61 @@
     <script src="{{ url_for('static', filename='js/flash.js') }}"></script>
     <script src="{{ url_for('static', filename='js/loader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal_utils.js') }}"></script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const requiredImages = new Set();
+
+            const waitElements = document.querySelectorAll("[data-wait-for-load]");
+
+            waitElements.forEach(el => {
+                if (el.tagName === "IMG" && el.src) {
+                    requiredImages.add(el.src);
+                }
+                if (el.dataset.src) {
+                    requiredImages.add(el.dataset.src);
+                }
+                if (el.dataset.night) {
+                    requiredImages.add(el.dataset.night);
+                } else requiredImages.add(el.dataset.day);
+            });
+
+            const total = requiredImages.size;
+            if (total === 0) {
+                document.body.classList.add("loaded");
+                return;
+            }
+
+            let loadedCount = 0;
+
+            function markLoaded() {
+                loadedCount++;
+                if (loadedCount === total) {
+                    // Apply background AFTER preload
+                    const controller = document.getElementById("background-controller");
+                    if (controller) {
+                        const hour = new Date().getHours();
+                        const bg = hour >= 6 && hour < 18
+                            ? controller.dataset.day
+                            : controller.dataset.night;
+
+                        document.body.style.backgroundImage = `url('${bg}')`;
+                    }
+
+                    // Reveal page
+                    document.body.classList.add("loaded");
+                }
+            }
+
+            requiredImages.forEach(src => {
+                const img = new Image();
+                img.onload = markLoaded;
+                img.onerror = markLoaded;
+                img.src = src;
+            });
+        });
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -7,7 +7,7 @@
 {% block content %}
 <aside class="sidebar">
     <div id="logo">
-        <img src="{{ url_for('static', filename='assets/logo/logo-470x620.png') }}" alt="Logo">
+        <img src="{{ url_for('static', filename='assets/logo/logo-470x620.png') }}" alt="Logo" data-wait-for-load>
     </div>
     <nav>
         <ul>
@@ -18,14 +18,18 @@
             {% for endpoint, label in nav_items %}
             <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
             {% endfor %}
-            {% if current_user.is_admin() %}
+            {% if current_user.is_authenticated and current_user.is_admin() %}
             <li><a href="{{ url_for('main.admin_panel') }}" class="{% if request.endpoint == 'main.admin_panel' %}active{% endif %}">Admin</a></li>
             {% endif %}
         </ul>
     </nav>
     <div id="bottom">
         <div id="account">
-            <p>{{ current_user.username }}</p>
+            {% if current_user.is_authenticated %}
+            <a title="Log out" href="{{ url_for('auth.logout') }}">{{ current_user.username }}</a>
+            {% else %}
+            <a title="Click for Registration" href="{{ url_for('auth.login') }}">Login</a>
+            {% endif %}
         </div>
     </div>
 </aside>

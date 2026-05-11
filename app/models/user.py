@@ -3,6 +3,7 @@ from flask import current_app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+from app.models.tournament import Tournament
 from ..utils.api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
 from enum import Enum
 
@@ -31,6 +32,15 @@ class User(UserMixin, db.Model):
         self.last_login_at = db.func.now()
         from flask_login import login_user
         login_user(self)
+
+    def delete(self):
+        """Delete user from database."""
+        tournaments = Tournament.query.filter_by(created_by=self.id).all()
+        from copy import copy
+        xuid = copy(self.xuid)
+        db.session.delete(self)
+        for tournament in tournaments:
+            tournament.set_created_by(xuid=xuid, delete_user=True)
 
     @property
     def role(self) -> UserRole:
@@ -82,23 +92,25 @@ class User(UserMixin, db.Model):
             current_app.logger.error(f"Error fetching player data for '{username}': {e}")
             raise UserNotFound(f"Failed to fetch player data.")
 
+    def validate(self):
+        return User.validate_user(self.username)
+
     @classmethod
     def validate_user(cls, username):
         """ Validates: 
         - User exists in NG API
         - User has a staff rank OR beta tester rank
+
+        Returns:
+        - [0] bool of validation (true = valid)
+        - [1] data for future use
         """
 
         data = cls.get_player_data(username)
 
-        if (staff := data['staff']) == False:
-            # No staff property? User not found
-            raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
-
-        if staff or any('tester' in rank.lower() for rank in data.get('ranks', [])):
-            return True
-
-        raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
+        try:
+            return data['staff'] or any('tester' in rank.lower() for rank in data.get('ranks', [])), data
+        except KeyError: raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
     
     @classmethod
     def create_user(cls, username, password) -> tuple['User', dict]:
@@ -116,25 +128,23 @@ class User(UserMixin, db.Model):
             raise UserAlreadyExists(username)
 
         try:
-            player_data = cls.get_player_data(username)
-            is_staff = bool(player_data.get('staff'))
-            ranks = player_data.get('ranks', [])
-            is_admin = any('admin' in rank.lower() for rank in ranks)
-            is_tester = any('tester' in rank.lower() for rank in ranks)
+            validated, data = cls.validate_user(username)
 
-            if not (is_staff or is_tester):
+            is_admin = any('admin' in rank.lower() for rank in data.get('ranks', []))
+
+            if not validated:
                 raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
 
             user = cls()
-            user.xuid = str(player_data.get('xuid'))
+            user.xuid = str(data.get('xuid'))
             user.username = username
             user.role = UserRole.ADMIN if is_admin else UserRole.STAFF
             user.set_password(password)
-            return user, player_data
+            return user, data
         except Exception as exc:
             db.session.rollback()
             raise exc
-    
+
     def __repr__(self):
         return f'<User {self.username} ({self.role})>'
 

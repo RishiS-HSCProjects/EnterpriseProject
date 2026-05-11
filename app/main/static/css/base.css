@@ -6,7 +6,7 @@
     height: 80vh;
     border-radius: 8px;
     display: grid;
-    grid-template-columns: 1fr 5fr;
+    grid-template-columns: minmax(200px, 1fr) 5fr;
     grid-template-areas: "sidebar main";
 }
 
@@ -16,7 +16,10 @@ aside {
     background-color: var(--background-card);
     border-radius: 8px;
     display: flex;
-    overflow: auto;
+    position: sticky;
+    top: 20px;
+    height: 90vh;
+    overflow: visible;
     flex-direction: column;
 }
 
@@ -72,14 +75,16 @@ aside #bottom {
     text-align: center;
 }
 
-aside #bottom p {
+aside #bottom a {
     font-weight: bold;
+    color: var(--text-on-background)
 }
 
-aside #bottom p:hover {
+aside #bottom a:hover {
     color: var(--primary);
     text-decoration: underline;
     cursor: pointer;
+    color: var(--primary)
 }
 
 #main {

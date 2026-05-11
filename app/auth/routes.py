@@ -1,5 +1,6 @@
 from flask import Blueprint, current_app, jsonify, render_template, redirect, url_for, session, request
 from app import db
+from app.models.tournament import Tournament
 from app.models.user import InvalidPassword, User, UserRole, UserNotFound, UserAlreadyExists
 from app.utils.utils import (
     flash_all_form_errors, flash, save_form_state, restore_form_state
@@ -18,9 +19,9 @@ def login():
 
     if form.validate_on_submit():
         try:
-            user = User.query.filter_by(username=form.username.data).first()
+            user: User = User.query.filter_by(username=form.username.data).first() # type: ignore
 
-            if user and user.check_password(form.password.data):
+            if user and user.check_password(form.password.data) and (user.validate()[0] if current_app.config.get('VERIFY_STAFF_STATUS') else True):
                 user.login()
                 flash('Login successful.', 'success')
                 return redirect(url_for('main.dashboard'))
@@ -30,8 +31,8 @@ def login():
                 save_form_state(form, 'login_form')
                 return redirect(url_for('auth.login'))
         except Exception as exc:
-            add_username_error(str(exc))
-            flash_all_form_errors(form)
+            current_app.logger.error(f"Unexpected error during user creation: {exc}")
+            flash("An unexpected error occurred. Please try again.")
             save_form_state(form, 'login_form')
             return redirect(url_for('auth.login'))
     elif form.errors:
@@ -173,7 +174,31 @@ def verify_registration_pin():
         return fail()
 
     db.session.add(user)
+
+    for tourn in Tournament.query.filter_by(created_by=user.xuid).all():
+        tourn.set_created_by(xuid=user.xuid)
+
     db.session.commit()
+
     session.pop('pending_registration', None)
     flash('Registration successful. You can now log in.', 'success')
     return jsonify({"status": "success"}), 200
+
+@auth_bp.route('/logout')
+def logout():
+    from flask_login import logout_user
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('auth.login'))
+
+@auth_bp.route('/delete')
+def delete_account():
+    from flask_login import current_user, logout_user
+    if current_user.is_authenticated:
+        current_user.delete()
+        db.session.commit()
+        logout_user()
+        flash('Your account has been deleted.', 'success')
+    else:
+        flash('You need to be logged in to delete your account.', 'error')
+    return redirect(url_for('auth.login'))

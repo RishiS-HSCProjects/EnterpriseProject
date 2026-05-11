@@ -6,6 +6,16 @@
     {{ super() }}
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/scheduler.css') }}">
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/tournament.css') }}">
+
+    {% if current_user.is_authenticated %}
+    <style>
+        .field-input:disabled,
+        .field-textarea:disabled {
+            color: rgba(255, 255, 255, 0.7);
+            cursor: not-allowed;
+        }
+    </style>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -19,6 +29,10 @@ function showRoundLeaderboard() {
     });
 }
 
+document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
+</script>
+{% if current_user.is_authenticated %}
+<script>
 async function cacheTournamentStats(event) {
     event.preventDefault();
 
@@ -59,9 +73,18 @@ async function cacheTournamentStats(event) {
         }
     }
 }
-
-document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
 </script>
+{% else %}
+<script>
+    function initForm() {
+        const formElements = document.querySelectorAll('input, textarea');
+        formElements.forEach((e) => {
+            e.disabled = true;
+        });
+    }
+    document.addEventListener('DOMContentLoaded', initForm);
+</script>
+{% endif %}
 {% endblock %}
 
 {% block page_content %}
@@ -71,7 +94,9 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
     <div class="editor-grid">
         <div class="editor-left">
             <form method="POST" id="tournament-edit-form">
+                {% if current_user.is_authenticated %}
                 {{ form.hidden_tag() }}
+                {% endif %}
 
                 <div class="form-group">
                     {{ form.name.label(class="field-label") }}
@@ -101,7 +126,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
 
                 <div class="form-group">
                     {{ form.discord_message.label(class="field-label") }}
-                    {% if tournament.tournament_info_discord_status %}
+                    {% if current_user.is_authenticated and tournament.tournament_info_discord_status %}
                         {{ form.discord_message(class="field-textarea", disabled=True, title="Locked because the tournament announcement has already been sent.") }}
                     {% else %}
                         {{ form.discord_message(class="field-textarea") }}
@@ -112,7 +137,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     <h4 style="font-size: 14px; font-weight: 600; margin: 0 0 8px 0;">Round Prizes</h4>
                     <div class="form-group">
                         {{ form.round_first_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.round_first_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.round_first_prize(class="field-input") }}
@@ -120,7 +145,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     </div>
                     <div class="form-group">
                         {{ form.round_second_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.round_second_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.round_second_prize(class="field-input") }}
@@ -128,7 +153,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     </div>
                     <div class="form-group">
                         {{ form.round_third_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.round_third_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.round_third_prize(class="field-input") }}
@@ -140,7 +165,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     <h4 style="font-size: 14px; font-weight: 600; margin: 0 0 8px 0;">Global Prizes</h4>
                     <div class="form-group">
                         {{ form.global_first_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.global_first_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.global_first_prize(class="field-input") }}
@@ -148,7 +173,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     </div>
                     <div class="form-group">
                         {{ form.global_second_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.global_second_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.global_second_prize(class="field-input") }}
@@ -156,7 +181,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     </div>
                     <div class="form-group">
                         {{ form.global_third_prize.label(class="field-label") }}
-                        {% if tournament.awards_distributed %}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
                             {{ form.global_third_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
                         {% else %}
                             {{ form.global_third_prize(class="field-input") }}
@@ -166,9 +191,10 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
 
             </form>
 
+            {% if current_user.is_authenticated %}
             <div class="auth-actions">
                 <button type="submit" form="tournament-edit-form" class="auth-button auth-button-primary">{{ form.submit.label.text }}</button>
-                {% if current_user.is_manager() %}
+                {% if current_user.is_authenticated and current_user.is_manager() %}
                 <form method="POST" action="{{ url_for('main.tournament_send_discord', tournament_id=tournament.id) }}" style="display: inline;">
                     {% if tournament.tournament_info_discord_status or tournament.is_expired %}
                         <button
@@ -224,6 +250,7 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                     {% endif %}
                 </form>
             </div>
+            {% endif %}
         </div>
 
         <div class="editor-right">
@@ -241,6 +268,8 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
                 <li>No leaderboard data available.</li>
             {% endif %}
 
+            <hr>
+            
             <h3>Round Leaderboards</h3>
             {% if round_leaderboards %}
                 <div class="form-group">
@@ -256,10 +285,9 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
 
                 {% for round_data in round_leaderboards %}
                     <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
-                        <h4>Round {{ round_data.round_num }}</h4>
                         <ol>
                             {% for p in round_data.leaderboard.get_top(10) %}
-                                <li>{{ p.player }} — {{ p.score }}</li>
+                                <li>{{ p.player }}: {{ p.score }} kills</li>
                             {% else %}
                                 <li>No leaderboard data available.</li>
                             {% endfor %}
@@ -272,6 +300,5 @@ document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
 
         </div>
     </div>
-
 </div>
 {% endblock %}

@@ -32,7 +32,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     NETHERGAMES_API_KEY = os.getenv('NETHERGAMES_API_KEY')
-
+    VERIFY_STAFF_STATUS = os.getenv('VERIFY_STAFF_STATUS', 'true').lower() in ['true', '1', 'yes']
 
 @login_manager.user_loader
 def load_user(user_id):

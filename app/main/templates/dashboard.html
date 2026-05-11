@@ -11,21 +11,25 @@
     {% if kpis %}
     <div id="kpi-panel">
         {% for kpi in kpis %}
-        {{ kpi_macro(title=kpi.title, value=kpi.value, unit=kpi.unit, hover_text=kpi.hover_text) }}
+        {{ kpi_macro(title=kpi.title, value=kpi.value, detail=kpi.detail, hover_text=kpi.hover_text, card_id='kpi-' ~ loop.index, href=kpi.href) }}
         {% endfor %}
     </div>
     <hr>
     {% endif %}
 {% endblock %}
 
-{% macro kpi_macro(title, value, unit, hover_text) %}
-<div class="kpi-card" title="{{ hover_text }}">
-    <h3>{{ title }}</h3>
-    <div class="kpi-value">
-        <div class="value-wrap">
-            <span class="value">{{ value }}</span>
-            <span class="unit">{{ unit }}</span>
-        </div>
-    </div>
-</div>
+{% macro kpi_macro(title, value, detail, hover_text, card_id, href=None) %}
+{% if href %}
+<a class="kpi-card kpi-link" id="{{ card_id }}" href="{{ href }}" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}">
+    <h3 class="kpi-top">{{ title }}</h3>
+    <div class="kpi-value">{{ value }}</div>
+    <p class="kpi-bottom">{{ detail }}</p>
+</a>
+{% else %}
+<article class="kpi-card" id="{{ card_id }}" role="group" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}">
+    <h3 class="kpi-top">{{ title }}</h3>
+    <div class="kpi-value">{{ value }}</div>
+    <p class="kpi-bottom">{{ detail }}</p>
+</article>
+{% endif %}
 {% endmacro %}

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify
 from flask_login import current_user, login_required
 from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes
-from app.utils.utils import flash, flash_all_form_errors, restore_form_state
+from app.utils.utils import flash, flash_all_form_errors, restore_form_state, save_form_state
 from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_lines, format_prize_lines, send as discord_send
 from time import time
 from datetime import datetime, UTC
@@ -12,132 +12,224 @@ main_bp = Blueprint("main", __name__, template_folder="templates", static_folder
 
 @main_bp.route('/')
 def dashboard():
-    if not current_user.is_authenticated:
-        return redirect(url_for('auth.login'))
-
     @dataclass
     class KPI:
         title: str
         value: str
-        unit: str = ""
+        detail: str = ""
         hover_text: str = ""
+        href: str | None = None
 
-    # Placeholder KPIs
-    kpis = [
-        KPI(title="Days till next tournament", value="12", unit="days", hover_text="Number of tournaments hosted"),
-        KPI(title="Active Players", value="350", unit="players", hover_text="Number of active players"),
-        KPI(title="Upcoming Events", value="3", unit="events", hover_text="Tournaments scheduled in the next month")
-    ]
+    def _format_days(value: int) -> str:
+        return "1" if value == 1 else str(value)
+
+    def _format_day_label(value: int) -> str:
+        return "day" if value == 1 else "days"
+
+    def _format_round_duration(seconds: float) -> str:
+        total_seconds = max(0, int(round(seconds)))
+        if total_seconds < 60:
+            return f"{total_seconds} seconds"
+        if total_seconds < 3600:
+            minutes = total_seconds // 60
+            remainder = total_seconds % 60
+            return f"{minutes}m {remainder}s"
+        hours = total_seconds // 3600
+        remainder = total_seconds % 3600
+        minutes = remainder // 60
+        return f"{hours}h {minutes}m"
+
+    now_ts = int(datetime.now(UTC).timestamp())
+    tournaments = Tournament.query.order_by(Tournament.start_unix.asc()).all()
+
+    active_tournament = next((t for t in tournaments if t.start_unix <= now_ts <= t.end_unix), None)
+    next_tournament = next((t for t in tournaments if t.start_unix > now_ts), None)
+    last_tournament = next((t for t in reversed(tournaments) if t.end_unix < now_ts), None)
+
+    kpis: list[KPI] = []
+
+    if active_tournament:
+        current_round = min(
+            active_tournament.round_count,
+            max(1, int((now_ts - active_tournament.start_unix) // active_tournament.round_duration) + 1),
+        )
+        kpis.append(KPI(
+            title="Active Tournament",
+            value=str(current_round),
+            detail=f"of {active_tournament.round_count} rounds",
+            hover_text=f"{active_tournament.name} is currently running.",
+            href=url_for('main.tournament_editor', tournament_id=active_tournament.id)
+        ))
+        kpis.append(KPI(
+            title="Status",
+            value="LIVE",
+            detail=active_tournament.name,
+            hover_text=f"Started {datetime.fromtimestamp(active_tournament.start_unix, UTC).strftime('%a, %d %b %Y %H:%M UTC')}"
+        ))
+        kpis.append(KPI(
+            title="Round Duration",
+            value=_format_round_duration(active_tournament.round_duration),
+            detail=f"{str(max(1, int(round(active_tournament.round_duration))))} seconds per round",
+            hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds."
+        ))
+    elif next_tournament:
+        days_until = max(0, (next_tournament.start_unix - now_ts + 86399) // 86400)
+        kpis.append(KPI(
+            title="Days to Next Tourney",
+            value=_format_days(days_until),
+            detail=_format_day_label(days_until),
+            hover_text=f"Next tournament: {next_tournament.name}"
+        ))
+        kpis.append(KPI(
+            title="Status",
+            value="UP NEXT",
+            detail=next_tournament.name,
+            hover_text="No tournament is currently running."
+        ))
+        kpis.append(KPI(
+            title="Round Duration",
+            value=_format_round_duration(next_tournament.round_duration),
+            detail=f"{str(max(1, int(round(next_tournament.round_duration))))} seconds per round",
+            hover_text=f"Future tournament round length: {next_tournament.round_duration:.0f} seconds."
+        ))
+    else:
+        if tournaments:
+            days_ago = max(0, (now_ts - tournaments[-1].end_unix) // 86400)
+            kpis.append(KPI(
+                title="Days Since Last Tourney",
+                value=_format_days(days_ago),
+                detail=f"{_format_day_label(days_ago)} ago",
+                hover_text=f"Last tournament: {tournaments[-1].name}"
+            ))
+        else:
+            kpis.append(KPI(
+                title="Days Since Last Tourney",
+                value="0",
+                detail="No tournaments yet",
+                hover_text="Create the first tournament to populate the dashboard."
+            ))
+
+        kpis.append(KPI(
+            title="Status",
+            value="IDLE",
+            detail="No active tournament",
+            hover_text="No tournament is currently active."
+        ))
+
+        kpis.append(KPI(
+            title="Round Duration",
+            value="0",
+            detail="N/A until a tournament exists",
+            hover_text="Round duration is only available once a tournament exists."
+        ))
+
+    if last_tournament:
+        overall_leaderboard = last_tournament.get_leaderboard(round_num=None)
+        last_winner = overall_leaderboard.get_entries(limit=1)
+        if last_winner:
+            winner = last_winner[0]
+            kpis.append(KPI(
+                title="Last Overall Winner",
+                value=str(winner.score),
+                detail=f"{winner.player} kills",
+                hover_text=f"Top performer from {last_tournament.name}.",
+                href=url_for('main.tournament_editor', tournament_id=last_tournament.id)
+            ))
+        else:
+            kpis.append(KPI(
+                title="Last Overall Winner",
+                value="0",
+                detail=f"{last_tournament.name} no leaderboard data",
+                hover_text="The last tournament has no archived overall leaderboard yet.",
+                href=url_for('main.tournament_editor', tournament_id=last_tournament.id)
+            ))
+    else:
+        kpis.append(KPI(
+            title="Last Overall Winner",
+            value="0",
+            detail="No finished tournaments yet",
+            hover_text="There is no completed tournament to summarize yet."
+        ))
 
     return render_template('dashboard.html', kpis=kpis)
 
 @main_bp.route('/scheduler', methods=['GET', 'POST'])
-@login_required
 def scheduler(open_add_modal=False):
     from app.forms import AddTournamentForm
-
+    
+    kwargs = {}
     now = int(datetime.now(UTC).timestamp())
 
-    previous_tournaments = (
-        Tournament.query
-        .filter(Tournament.end_unix < now)
-        .order_by(Tournament.end_unix.desc())
-        .limit(2)
-        .all()
-        or []
-    )
-    # reverse the list so most-recent is first
-    previous_tournaments = list(reversed(previous_tournaments))
-    current_tournament = (
-        Tournament.query
-        .filter(Tournament.start_unix <= now, Tournament.end_unix >= now)
-        .order_by(Tournament.start_unix.asc())
-        .first()
-    )
-    future_tournaments = (
-        Tournament.query
-        .filter(Tournament.start_unix > now)
-        .order_by(Tournament.start_unix.asc())
-        .all()
-    )
+    # 1. Fetch Tournament Data
+    previous = Tournament.query.filter(Tournament.end_unix < now).order_by(Tournament.end_unix.desc()).limit(2).all() or []
+    
+    kwargs.update({
+        'previous_tournaments': list(reversed(previous)),
+        'current_tournament': Tournament.query.filter(Tournament.start_unix <= now, Tournament.end_unix >= now).order_by(Tournament.start_unix.asc()).first(),
+        'future_tournaments': Tournament.query.filter(Tournament.start_unix > now).order_by(Tournament.start_unix.asc()).all()
+    })
 
-    add_form = restore_form_state(AddTournamentForm())
+    # 2. Handle Form Logic
+    add_form = None
+    if current_user.is_authenticated:
+        add_form = restore_form_state(AddTournamentForm())
 
-    if add_form.validate_on_submit():
-        start_unix = add_form.start_unix.data
-        end_unix = add_form.end_unix.data
-        round_count = add_form.round_count.data
-        name = (add_form.name.data or '').strip()
-        assert start_unix is not None
-        assert end_unix is not None
-        assert round_count is not None
-
-        # Check for time overlap with existing tournaments
-        overlap = Tournament.query.filter(
-            Tournament.start_unix < end_unix,
-            Tournament.end_unix > start_unix
-        ).first()
-        if overlap:
-            flash(f'Time overlap with tournament "{overlap.name}" (unix {overlap.start_unix}-{overlap.end_unix})', 'error')
-        else:
-            Tournament.create(
-                name=name,
-                start_unix=start_unix,
-                end_unix=end_unix,
-                round_count=round_count,
-                created_by=current_user.id,
-                prizes=TournamentPrizes(
-                    overall_first=(add_form.global_first_prize.data or '').strip(),
-                    overall_second=(add_form.global_second_prize.data or '').strip(),
-                    overall_third=(add_form.global_third_prize.data or '').strip(),
-                    round_first=(add_form.round_first_prize.data or '').strip(),
-                    round_second=(add_form.round_second_prize.data or '').strip(),
-                    round_third=(add_form.round_third_prize.data or '').strip(),
+        if add_form.validate_on_submit():
+            # Check for time overlap
+            start, end = add_form.start_unix.data, add_form.end_unix.data
+            overlap = Tournament.query.filter(Tournament.start_unix < end, Tournament.end_unix > start).first()
+            
+            if overlap:
+                flash(f'Time overlap with tournament "{overlap.name}"', 'error')
+            else:
+                Tournament.create(
+                    name=(add_form.name.data or '').strip(),
+                    start_unix=start,
+                    end_unix=end,
+                    round_count=add_form.round_count.data,
+                    created_by=current_user.id,
+                    prizes=TournamentPrizes(
+                        overall_first=(add_form.global_first_prize.data or '').strip(),
+                        overall_second=(add_form.global_second_prize.data or '').strip(),
+                        overall_third=(add_form.global_third_prize.data or '').strip(),
+                        round_first=(add_form.round_first_prize.data or '').strip(),
+                        round_second=(add_form.round_second_prize.data or '').strip(),
+                        round_third=(add_form.round_third_prize.data or '').strip(),
+                    )
                 )
-            )
-            flash('Tournament added successfully!', 'success')
-            return redirect(url_for('main.scheduler'))
-    elif request.method == 'POST':
-        flash_all_form_errors(add_form)
+                flash('Tournament added successfully!', 'success')
+                return redirect(url_for('main.scheduler'))
+        
+        elif request.method == 'POST':
+            flash_all_form_errors(add_form)
 
-    return render_template(
-        'scheduler.html',
-        add_form=add_form,
-        previous_tournaments=previous_tournaments,
-        current_tournament=current_tournament,
-        future_tournaments=future_tournaments,
-        show_add_modal=open_add_modal or add_form.errors,
-    )
+    # 3. Consolidate Remaining UI State
+    kwargs['add_form'] = add_form
+    kwargs['show_add_modal'] = open_add_modal or (add_form.errors if add_form else False)
+
+    return render_template('scheduler.html', **kwargs)
 
 @main_bp.route('/admin')
 @login_required
 def admin_panel():
-    if not current_user.is_authenticated:
-        return redirect(url_for('auth.login'))
     if not current_user.is_admin():
         return "Access denied: Admins only.", 403
 
     return 'Admin Panel - Coming Soon!'
 
 @main_bp.route('/scheduler/<int:tournament_id>', methods=['GET', 'POST'])
-@login_required
 def tournament_editor(tournament_id: int):
     from app.forms import AddTournamentForm
+    from app import db
 
     tourney = Tournament.query.get_or_404(tournament_id)
-    if not tourney:
-        flash('Tournament not found', 'error')
-        return redirect(url_for('main.scheduler'))
-
+    kwargs = {'tournament': tourney}
     if tourney.is_expired and not tourney.tournament_info_discord_status:
         tourney.tournament_info_discord_status = True
-        from app import db
         db.session.commit()
 
-    form = restore_form_state(AddTournamentForm())
-
-    # Autofill fields from tournament object on GET request
-    if request.method == 'GET' or not form.is_submitted():
+    form = AddTournamentForm()
+    if request.method == 'GET':
         form.name.data = tourney.name
         form.start_unix.data = tourney.start_unix
         form.end_unix.data = tourney.end_unix
@@ -150,61 +242,52 @@ def tournament_editor(tournament_id: int):
         form.round_first_prize.data = prizes.get('round_first', '')
         form.round_second_prize.data = prizes.get('round_second', '')
         form.round_third_prize.data = prizes.get('round_third', '')
-
-    # Handle form submission for edits
-    if form.validate_on_submit():
-        start_unix = form.start_unix.data
-        end_unix = form.end_unix.data
-        round_count = form.round_count.data
-        assert start_unix is not None
-        assert end_unix is not None
-        assert round_count is not None
-
-        # Check for time overlap with other tournaments
-        overlap = Tournament.query.filter(
-            Tournament.id != tourney.id,
-            Tournament.start_unix < end_unix,
-            Tournament.end_unix > start_unix
-        ).first()
-        if overlap:
-            flash(f'Time overlap with tournament "{overlap.name}" (unix {overlap.start_unix}-{overlap.end_unix})', 'error')
-        else:
-            tourney.name = (form.name.data or '').strip()
-            tourney.start_unix = int(start_unix)
-            tourney.end_unix = int(end_unix)
-            if round_count < 1:
-                flash('Round count must be at least 1', 'error')
-            else: tourney.round_count = int(round_count)
-
-            tourney.prizes = {
-                'overall_first': (form.global_first_prize.data or '').strip(),
-                'overall_second': (form.global_second_prize.data or '').strip(),
-                'overall_third': (form.global_third_prize.data or '').strip(),
-                'round_first': (form.round_first_prize.data or '').strip(),
-                'round_second': (form.round_second_prize.data or '').strip(),
-                'round_third': (form.round_third_prize.data or '').strip(),
-            }
-            if not tourney.tournament_info_discord_status:
-                if form.discord_message.data and form.discord_message.data.strip() != tourney.tournament_info_discord_message:
-                    tourney.tournament_info_discord_message = form.discord_message.data.strip()
-            else: flash('Tournament info Discord message is locked and cannot be edited.', 'error')
-
-            from app import db
-            db.session.commit()
-            flash('Tournament updated', 'success')
-            return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
     elif request.method == 'POST':
-        flash_all_form_errors(form)
+        save_form_state(form, form_id='tournament_editor')
 
-    # leaderboard views (current round and overall)
+    if current_user.is_authenticated:
+        form = restore_form_state(form)
+
+        if form.validate_on_submit():
+            start, end, rounds = form.start_unix.data, form.end_unix.data, form.round_count.data
+
+            overlap = Tournament.query.filter(
+                Tournament.id != tourney.id,
+                Tournament.start_unix < end,
+                Tournament.end_unix > start
+            ).first()
+
+            if overlap:
+                flash(f'Time overlap with tournament "{overlap.name}"', 'error')
+            elif rounds < 1:
+                flash('Round count must be at least 1', 'error')
+            else:
+                tourney.name = (form.name.data or '').strip()
+                tourney.start_unix, tourney.end_unix, tourney.round_count = int(start), int(end), int(rounds)
+                tourney.prizes = {
+                    'overall_first': (form.global_first_prize.data or '').strip(),
+                    'overall_second': (form.global_second_prize.data or '').strip(),
+                    'overall_third': (form.global_third_prize.data or '').strip(),
+                    'round_first': (form.round_first_prize.data or '').strip(),
+                    'round_second': (form.round_second_prize.data or '').strip(),
+                    'round_third': (form.round_third_prize.data or '').strip(),
+                }
+
+                if not tourney.tournament_info_discord_status:
+                    tourney.tournament_info_discord_message = (form.discord_message.data or '').strip()
+
+                db.session.commit()
+                flash('Tournament updated', 'success')
+                return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+        elif request.method == 'POST':
+            flash_all_form_errors(form)
+
     current_round = None
-    if tourney.is_active:
-        # approximate current round
+    if tourney.is_active and tourney.round_duration > 0:
         elapsed = int(time()) - tourney.start_unix
-        if tourney.round_duration > 0:
-            current_round = min(tourney.round_count, max(1, int(elapsed // tourney.round_duration) + 1))
+        current_round = min(tourney.round_count, max(1, int(elapsed // tourney.round_duration) + 1))
 
-    leaderboard_overall = tourney.get_leaderboard(round_num=None)
     if tourney.is_active and current_round:
         round_numbers = list(range(1, current_round + 1))
     elif tourney.is_expired:
@@ -212,63 +295,37 @@ def tournament_editor(tournament_id: int):
     else:
         round_numbers = []
 
-    round_leaderboards = [
-        {
-            'round_num': round_num,
-            'leaderboard': tourney.get_leaderboard(round_num=round_num),
-        }
-        for round_num in round_numbers
-    ]
-    selected_round = current_round if current_round else (round_leaderboards[-1]['round_num'] if round_leaderboards else None)
-    cache_stats_locked = tourney.is_archived()
-
     now_ts = int(datetime.now(UTC).timestamp())
-
-    def _relative(ts: int) -> str:
-        diff = ts - now_ts
-        abs_diff = abs(diff)
-        if abs_diff < 60:
-            amount = abs_diff
-            unit = 's'
-        elif abs_diff < 3600:
-            amount = abs_diff // 60
-            unit = 'm'
-        elif abs_diff < 86400:
-            amount = abs_diff // 3600
-            unit = 'h'
-        else:
-            amount = abs_diff // 86400
-            unit = 'd'
-
-        if diff == 0:
-            return 'now'
-        if diff > 0:
-            return f'in {amount}{unit}'
-        return f'{amount}{unit} ago'
-
     start_dt = datetime.fromtimestamp(tourney.start_unix, UTC)
     end_dt = datetime.fromtimestamp(tourney.end_unix, UTC)
 
-    epoch_details = {
-        'start_gmt': start_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
-        'end_gmt': end_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
-        'start_local_title': f"Local: {start_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
-        'end_local_title': f"Local: {end_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
-        'start_relative_title': f"Relative: {_relative(tourney.start_unix)}",
-        'end_relative_title': f"Relative: {_relative(tourney.end_unix)}",
-    }
+    kwargs.update({
+        'form': form,
+        'leaderboard_overall': tourney.get_leaderboard(round_num=None),
+        'current_round': current_round,
+        'round_leaderboards': [{'round_num': r, 'leaderboard': tourney.get_leaderboard(round_num=r)} for r in round_numbers],
+        'selected_round': current_round or (round_numbers[-1] if round_numbers else None),
+        'cache_stats_locked': tourney.is_archived(),
+        'epoch_details': {
+            'start_gmt': start_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
+            'end_gmt': end_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
+            'start_local_title': f"Local: {start_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            'end_local_title': f"Local: {end_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            'start_relative_title': f"Relative: {_relative_logic(tourney.start_unix, now_ts)}",
+            'end_relative_title': f"Relative: {_relative_logic(tourney.end_unix, now_ts)}",
+        }
+    })
 
-    return render_template(
-        'tournament_detail.html',
-        form=form,
-        tournament=tourney,
-        leaderboard_overall=leaderboard_overall,
-        current_round=current_round,
-        round_leaderboards=round_leaderboards,
-        selected_round=selected_round,
-        cache_stats_locked=cache_stats_locked,
-        epoch_details=epoch_details,
-    )
+    return render_template('tournament_detail.html', **kwargs)
+
+def _relative_logic(ts, now_ts):
+    diff = ts - now_ts
+    abs_diff = abs(diff)
+    if abs_diff < 60: amount, unit = abs_diff, 's'
+    elif abs_diff < 3600: amount, unit = abs_diff // 60, 'm'
+    elif abs_diff < 86400: amount, unit = abs_diff // 3600, 'h'
+    else: amount, unit = abs_diff // 86400, 'd'
+    return 'now' if diff == 0 else (f'in {amount}{unit}' if diff > 0 else f'{amount}{unit} ago')
 
 
 @main_bp.route('/scheduler/<int:tournament_id>/discord/send', methods=['POST'])
@@ -428,9 +485,11 @@ def tournament_send_prizes_discord(tournament_id: int):
 
     flash('Prize announcement sent', 'success')
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
 @main_bp.route('/scheduler/<int:tournament_id>/cache/stats', methods=['POST'])
 @login_required
 def tournament_cache_stats(tournament_id: int):
+    # TODO: Add disqualified players tracking
     tourney = Tournament.query.get_or_404(tournament_id)
 
     def _round_keys() -> set[int]:

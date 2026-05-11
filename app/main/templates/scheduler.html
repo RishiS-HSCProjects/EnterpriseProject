@@ -17,7 +17,9 @@
     {% if not previous_tournaments and not current_tournament and not future_tournaments %}
         <div class="empty-state">
             <h2>No tournaments scheduled</h2>
+            {% if current_user.is_authenticated %}
             <p>Click "Create Tournament" to add a new tournament.</p>
+            {% endif %}
         </div>
     {% endif %}
 
@@ -38,10 +40,13 @@
 
 </div>
 
+{% if current_user.is_authenticated %}
 <button class="create-tournament-btn">
     Create Tournament
 </button>
+{% endif %}
 
+{% if add_form %}
 <div id="add-modal" class="modal" hidden data-show-add-modal="{{ 'true' if show_add_modal else 'false' }}">
     <div class="modal-overlay"></div>
 
@@ -200,6 +205,7 @@
         </form>
     </div>
 </div>
+{% endif %}
 </div>
 {% endblock %}
 
