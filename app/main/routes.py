@@ -215,7 +215,10 @@ def admin_panel():
     if not current_user.is_admin():
         return "Access denied: Admins only.", 403
 
-    return 'Admin Panel - Coming Soon!'
+    # TODO: Add/remove staff
+    # TODO: See blocked IPs, times, and reasons for blockage.
+
+    return render_template("admin.html")
 
 @main_bp.route('/scheduler/<int:tournament_id>', methods=['GET', 'POST'])
 def tournament_editor(tournament_id: int):
@@ -299,11 +302,98 @@ def tournament_editor(tournament_id: int):
     start_dt = datetime.fromtimestamp(tourney.start_unix, UTC)
     end_dt = datetime.fromtimestamp(tourney.end_unix, UTC)
 
+    # Build round leaderboards
+    round_leaderboards = []
+    all_disqualified_players = {}  # {player_name: [list of {round, punishments}]}
+
+    for r in round_numbers:
+        round_data = {
+            'round_num': r,
+            'leaderboard': tourney.get_leaderboard(round_num=r),
+        }
+
+        # Get disqualified players from archive if available
+        if tourney.archives and 'rounds' in tourney.archives:
+            round_key = str(r)
+            if round_key in tourney.archives['rounds']:
+                round_archive = tourney.archives['rounds'][round_key]
+
+                if 'disqualifiedPlayers' in round_archive:
+                    from app.models.tournament import PunishmentType
+                    # Find if disqualified players exist
+                    for disq_player_data in round_archive['disqualifiedPlayers']:
+                        player_name = disq_player_data.get('player', 'Unknown')
+                        punishments = disq_player_data.get('punishments', [])
+
+                        # Format punishments
+                        formatted_punishments = []
+                        for p in punishments:
+                            try:
+                                punishment_type = PunishmentType[p.get('type').upper()]
+                                reason = punishment_type.past_tense
+                            except KeyError:
+                                current_app.logger.error(
+                                    "Unknown punishment type provided: %s\nDataset: %s",
+                                    p.get('type', 'UNKNOWN'), p
+                                )
+                                punishment_type = PunishmentType.BAN # default to ban in the case of errors
+                                reason = "unknown punishment"
+
+                            issued_at = p.get('issued_at')
+                            end_at = p.get('end_at')
+
+                            # Determine reason for disqualification
+                            # Determine reason for disqualification
+                            start = tourney.start_unix
+                            lookback = punishment_type.lookback_seconds
+                            lookback_days = lookback // (24 * 60 * 60) # 24h
+
+                            if not end_at or not start:
+                                # Missing timestamps, assume qualified
+                                current_app.logger.error(
+                                    "Timestamps not returned for punishment %s: %s",
+                                    p.get('id', 'UNKNOWN'), # punishment id
+                                    p # full punishment data
+                                )
+                                continue
+                            elif end_at >= start:
+                                # Punishment active during tournament
+                                reason = f"{reason} during tournament"
+                            elif end_at >= start - lookback:
+                                # Before tournament but within lookback window
+                                reason = f"{reason} before tournament (within {lookback_days}d lookback)"
+                            else:
+                                # Before tournament, outside lookback
+                                reason = f"{reason} before tournament"
+
+                            # Format dates
+                            issued_date = datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown'
+                            end_date = datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown'
+                            
+                            formatted_punishments.append({
+                                'type': punishment_type.name,
+                                'issued_date': issued_date,
+                                'end_date': end_date,
+                                'reason': reason
+                            })
+
+                        # Aggregate player disqualifications
+                        if player_name not in all_disqualified_players:
+                            all_disqualified_players[player_name] = []
+                        
+                        all_disqualified_players[player_name].append({
+                            'round': r,
+                            'punishments': formatted_punishments
+                        })
+
+        round_leaderboards.append(round_data)
+
     kwargs.update({
         'form': form,
         'leaderboard_overall': tourney.get_leaderboard(round_num=None),
         'current_round': current_round,
-        'round_leaderboards': [{'round_num': r, 'leaderboard': tourney.get_leaderboard(round_num=r)} for r in round_numbers],
+        'round_leaderboards': round_leaderboards,
+        'all_disqualified_players': all_disqualified_players,
         'selected_round': current_round or (round_numbers[-1] if round_numbers else None),
         'cache_stats_locked': tourney.is_archived(),
         'epoch_details': {
@@ -478,10 +568,9 @@ def tournament_send_prizes_discord(tournament_id: int):
         flash('Error sending Discord message. Please contact an administrator.', 'error')
         return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 
-    # TODO: Enable. Disabled for testing purposes to allow resending
-    # tourney.awards_distributed = True
-    # from app import db
-    # db.session.commit()
+    tourney.awards_distributed = True
+    from app import db
+    db.session.commit()
 
     flash('Prize announcement sent', 'success')
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
@@ -489,8 +578,14 @@ def tournament_send_prizes_discord(tournament_id: int):
 @main_bp.route('/scheduler/<int:tournament_id>/cache/stats', methods=['POST'])
 @login_required
 def tournament_cache_stats(tournament_id: int):
-    # TODO: Add disqualified players tracking
     tourney = Tournament.query.get_or_404(tournament_id)
+    current_app.logger.info(
+        "Cache stats requested for tournament id=%s name=%s round_count=%s archived_rounds=%s",
+        tourney.id,
+        tourney.name,
+        tourney.round_count,
+        sorted((tourney.archives or {}).get('rounds', {}).keys()) if isinstance(tourney.archives, dict) else [],
+    )
 
     def _round_keys() -> set[int]:
         archives = tourney.archives or {}
@@ -513,29 +608,77 @@ def tournament_cache_stats(tournament_id: int):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     before_rounds = _round_keys()
-    
+    current_app.logger.debug(
+        "Cache stats before archive attempt for tournament id=%s: round_keys=%s",
+        tourney.id,
+        sorted(before_rounds),
+    )
+
     try:
         failures = list(tourney.archive_stats())
+        current_app.logger.info(
+            "Archive generator completed for tournament id=%s with results=%s",
+            tourney.id,
+            failures,
+        )
         failed_rounds = sorted(round_num for round_num, ok in failures if ok is False)
+
+        # Refresh to get updated archive data
+        from app import db
+        db.session.refresh(tourney)
+
         after_rounds = _round_keys()
+        current_app.logger.debug(
+            "Cache stats after archive attempt for tournament id=%s: round_keys=%s",
+            tourney.id,
+            sorted(after_rounds),
+        )
         cached_rounds = sorted(after_rounds - before_rounds)
 
         if cached_rounds:
             message = f"Successfully cached {_format_rounds(cached_rounds)}"
+            current_app.logger.info(
+                "Cache stats success for tournament id=%s: cached_rounds=%s failed_rounds=%s",
+                tourney.id,
+                cached_rounds,
+                failed_rounds,
+            )
             if is_ajax:
                 return jsonify({'success': True, 'message': message, 'cached_rounds': cached_rounds, 'failed_rounds': failed_rounds})
             flash(message, 'success')
         elif failed_rounds:
             message = f"Failed to cache {_format_rounds(failed_rounds)}"
+            current_app.logger.error(
+                "Cache stats failure for tournament id=%s: failed_rounds=%s before_rounds=%s after_rounds=%s",
+                tourney.id,
+                failed_rounds,
+                sorted(before_rounds),
+                sorted(after_rounds),
+            )
             if is_ajax:
                 return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': failed_rounds}), 500
             flash(message, 'error')
         else:
             message = 'No finished rounds available to cache.'
+            current_app.logger.error(
+                "Cache stats found no finished rounds for tournament id=%s: before_rounds=%s after_rounds=%s round_count=%s current_round=%s is_active=%s is_expired=%s",
+                tourney.id,
+                sorted(before_rounds),
+                sorted(after_rounds),
+                tourney.round_count,
+                getattr(tourney, 'current_round', None),
+                tourney.is_active,
+                tourney.is_expired,
+            )
             if is_ajax:
                 return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
             flash(message, 'error')
     except TournamentArchiveException as exc:
+        current_app.logger.error(
+            "TournamentArchiveException while caching tournament id=%s: %s",
+            tourney.id,
+            exc,
+        )
         message = f'Error archiving stats: {str(exc)}'
         if is_ajax:
             return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400

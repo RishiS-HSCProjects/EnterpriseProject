@@ -285,6 +285,7 @@ async function cacheTournamentStats(event) {
 
                 {% for round_data in round_leaderboards %}
                     <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
+                        <h4>Winners</h4>
                         <ol>
                             {% for p in round_data.leaderboard.get_top(10) %}
                                 <li>{{ p.player }}: {{ p.score }} kills</li>
@@ -298,6 +299,32 @@ async function cacheTournamentStats(event) {
                 <p>No round leaderboards available yet.</p>
             {% endif %}
 
+            {% if all_disqualified_players %}
+            <hr>
+
+            <h3 style="color: #ff8c00;">Disqualified Players</h3>
+            <div style="background: rgba(255, 140, 0, 0.05); padding: 16px; border-radius: 4px;">
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for player_name, disq_rounds in all_disqualified_players.items() %}
+                        <li style="margin-bottom: 16px; padding: 12px; background: rgba(255, 140, 0, 0.08); border-left: 3px solid #ff8c00; border-radius: 2px;">
+                            <strong>{{ player_name }}</strong>
+                            {% for round_entry in disq_rounds %}
+                                <br>
+                                <small style="color: #bbb;">Round {{ round_entry.round }}:</small>
+                                {% for punishment in round_entry.punishments %}
+                                    <br>
+                                    <span style="font-size: 0.9em;">
+                                        <strong>{{ punishment.type }}</strong>: Issued {{ punishment.issued_date }} — Expires {{ punishment.end_date }}
+                                    </span>
+                                    <br>
+                                    <small style="color: #999;">Reason: {{ punishment.reason }}</small>
+                                {% endfor %}
+                            {% endfor %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
