@@ -58,7 +58,7 @@ class AddTournamentForm(FlaskForm):
     def validate_round_count(self, field):
         if field.data < 1:
             raise ValidationError('Round count must be at least 1')
-        
+
         if self.start_unix.data and self.end_unix.data:
             total_duration = (self.end_unix.data - self.start_unix.data)
             round_duration = total_duration / field.data
@@ -68,3 +68,17 @@ class AddTournamentForm(FlaskForm):
     def validate_discord_message(self, field):
         if field.data and len(field.data) > 2000:
             raise ValidationError('Discord message cannot exceed 2000 characters.')
+
+class WhitelistAddForm(FlaskForm):
+    """Form for adding a staff account to the whitelist."""
+    username = StringField('Minecraft Username', validators=[DataRequired(), Length(min=3, max=80)])
+    submit = SubmitField('Add to Whitelist')
+
+class BlockedIpAddForm(FlaskForm):
+    """Form for adding a blocked IP address."""
+    ip_address = StringField('IP Address', validators=[DataRequired(), Length(min=7, max=45)])
+    submit = SubmitField('Block IP')
+
+class EmptyForm(FlaskForm):
+    """CSRF-only form for POST actions that do not require fields."""
+    submit = SubmitField('Submit')

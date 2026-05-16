@@ -4,6 +4,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 from app.models.tournament import Tournament
+from app.models.whitelist import UserNotWhitelisted, Whitelist
 from ..utils.api_utils import request, NetherGamesAPIError, UnknownPlayer, MissingAccess, MaintenanceMode
 from enum import Enum
 
@@ -18,7 +19,7 @@ class UserRole(Enum):
 class User(UserMixin, db.Model):
     """User model for staff, managers, and admins."""
     __tablename__ = 'users'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     xuid = db.Column(db.String(50), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
@@ -29,9 +30,14 @@ class User(UserMixin, db.Model):
 
     def login(self):
         """Update last login time."""
-        self.last_login_at = db.func.now()
-        from flask_login import login_user
-        login_user(self)
+        wl = Whitelist.query.filter_by(xuid=self.xuid).first()
+        if wl:
+            self.last_login_at = db.func.now()
+            db.session.commit()
+            from flask_login import login_user
+            login_user(self)
+        else:
+            raise UserNotWhitelisted(f"User {self.username} is not whitelisted.")
 
     def delete(self):
         """Delete user from database."""
@@ -49,7 +55,7 @@ class User(UserMixin, db.Model):
             return UserRole[self._role]
         except KeyError:
             return UserRole.STAFF
-    
+
     @role.setter
     def role(self, value: UserRole):
         """Store the enum name as a string in the database."""
@@ -63,20 +69,21 @@ class User(UserMixin, db.Model):
         if not password or len(password) < 8:
             raise InvalidPassword("Password must be at least 8 characters long.")
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         """Check if password matches hash."""
         return check_password_hash(self.password_hash, password)
-    
+
     def is_manager(self):
         return self.role.value >= UserRole.MANAGER.value
-    
+
     def is_admin(self):
         return self.role == UserRole.ADMIN
-    
+
     @classmethod
     def get_player_data(cls, username):
-        """Get player data from NetherGames API."""
+        """Get player data from NetherGames API. Accepts username and XUID"""
+        username = escape(username.strip())
         try:
             response = request(f"players/{username}")
             if not response:
@@ -111,12 +118,12 @@ class User(UserMixin, db.Model):
         try:
             return data['staff'] or any('tester' in rank.lower() for rank in data.get('ranks', [])), data
         except KeyError: raise UserNotFound(f"User with username '{username}' not found in NetherGames API.")
-    
+
     @classmethod
     def create_user(cls, username, password) -> tuple['User', dict]:
         """
         Create a new user if they exist in NG API and have the right ranks.
-        
+
         Returns tuple:
         - 'User' class object
         - dict of user API data
@@ -124,20 +131,26 @@ class User(UserMixin, db.Model):
 
         username = escape(username.strip())
         user = cls.query.filter_by(username=username).first()
-        if user:
-            raise UserAlreadyExists(username)
+        if user: raise UserAlreadyExists(username)
 
         try:
             validated, data = cls.validate_user(username)
 
-            is_admin = any('admin' in rank.lower() for rank in data.get('ranks', []))
-
             if not validated:
                 raise UserNotFound(f"User with username '{username}' is not eligible for system access.")
 
+            xuid = str(data.get('xuid') or '')
+            if not xuid:
+                raise UserNotFound(f"User with username '{username}' not found in the NetherGames API.")
+
+            if not Whitelist.query.filter_by(xuid=xuid).first():
+                raise UserNotWhitelisted(f"User {username} is not whitelisted.")
+
+            is_admin = any('admin' in rank.lower() for rank in data.get('ranks', []))
+
             user = cls()
-            user.xuid = str(data.get('xuid'))
-            user.username = username
+            user.xuid = xuid
+            user.username = data.get('name') # Handle for casing
             user.role = UserRole.ADMIN if is_admin else UserRole.STAFF
             user.set_password(password)
             return user, data

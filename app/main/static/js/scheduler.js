@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('add-modal');
     if (!modal) return;
 
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { limit: 2592000, unit: 'day', divisor: 86400 }, // Approximate month as 30 days
             { limit: Infinity, unit: 'month', divisor: 2592000 } // Approximate month as 30 days
         ];
-        
+
         for (const { limit, unit, divisor = 1 } of units) {
             if (abs < limit) {
                 const value = divisor === 1 ? abs : Math.floor(abs / divisor);
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return future ? `in ${value} ${unit}${s}` : `${value} ${unit}${s} ago`;
             }
         }
-        
+
         const years = Math.floor(abs / 31536000);
         const s = years !== 1 ? 's' : '';
         return future ? `in ${years} year${s}` : `${years} year${s} ago`;
@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { limit: 604800, unit: 'day', divisor: 86400 },
             { limit: Infinity, unit: 'week', divisor: 604800 }
         ];
-        
+
         for (const { limit, unit, divisor = 1 } of units) {
             if (seconds < limit) {
                 const value = divisor === 1 ? Math.round(seconds) : (seconds / divisor).toFixed(1);
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const inputEl = document.getElementById(input);
         const previewEl = document.getElementById(preview);
         if (!inputEl || !previewEl) return;
-        
+
         const update = () => {
             const v = parseInt(inputEl.value, 10);
             if (isNaN(v)) {
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const picker = document.getElementById(pickerId);
         const input = document.getElementById(unixInputId);
         if (!picker || !input) return;
-        
+
         picker.addEventListener('change', () => {
             const epoch = dateToEpoch(picker.value);
             if (epoch !== null) {

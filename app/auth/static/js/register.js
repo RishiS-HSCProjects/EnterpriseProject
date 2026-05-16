@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
         handlePinSubmit();
     });
 
-    // Wire up pin modal using centralized helper if available
     const regState = document.getElementById('registration-state');
     const autoOpen = regState && regState.dataset.openPinModal === 'true';
     if (typeof setupFormModal === 'function') {
@@ -73,7 +72,7 @@ function handleVerificationSubmit() {
 function handlePinSubmit() {
     const form = document.getElementById("pin-form");
     const formData = new FormData(form);
-    
+
     fetch("/register/verify/pin", {
         method: "POST",
         body: formData,

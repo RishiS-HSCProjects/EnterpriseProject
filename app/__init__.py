@@ -17,7 +17,7 @@ class Config:
     """Configuration settings for PLX Management System Flask application."""
     DEBUG = os.getenv('DEBUG', 'false').lower() in ['true', '1', 'yes']
     FLASK_ENV = os.getenv('FLASK_ENV', 'production')
-    
+
     SECRET_KEY = os.getenv('SECRET_KEY')
     if not SECRET_KEY:
         raise ValueError("No SECRET_KEY set for Flask application. Required for session security.")
@@ -43,12 +43,12 @@ def create_app():
     """Factory function to create and configure the Flask application instance."""
     app = Flask(__name__, template_folder='templates', static_folder='static')
     app.config.from_object(Config)
-    
+
     db.init_app(app)
     global migrate
     migrate = Migrate(app, db)
     login_manager.init_app(app)
-    
+
     with app.app_context():
         db.create_all()
 
@@ -56,5 +56,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     from app.main.routes import main_bp
     app.register_blueprint(main_bp)
-    
+    from app.admin.routes import admin_bp
+    app.register_blueprint(admin_bp)
+
     return app

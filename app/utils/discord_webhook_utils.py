@@ -6,7 +6,7 @@ from flask import current_app
 class ChannelWebhookUrl(Enum):
     SECURE_WEBHOOK_URL = auto()
     ANNOUNCEMENT_WEBHOOK_URL = auto()
-    
+
     @property
     def url(self) -> str | None:
         mapping = {
@@ -57,11 +57,11 @@ def send(
 
 def format_placement_lines(entries, label: str = 'kills') -> str:
     """Format leaderboard entries as markdown lines.
-    
+
     Args:
         entries: List of leaderboard entry objects with .player and .score attributes
         label: Label for the score (default: 'kills')
-    
+
     Returns:
         Formatted markdown string with numbered placement lines
     """
@@ -72,19 +72,18 @@ def format_placement_lines(entries, label: str = 'kills') -> str:
 
 def format_prize_lines(prizes: dict[str, str]) -> str:
     """Format prize dictionary as markdown lines.
-    
+
     Args:
         prizes: Dict with keys 'first', 'second', 'third'
-    
+
     Returns:
         Formatted markdown string with prize placements
     """
     return (
-        f"- **1st:** {prizes.get('first', 'TBA')}\n"
-        f"- **2nd:** {prizes.get('second', 'TBA')}\n"
-        f"- **3rd:** {prizes.get('third', 'TBA')}"
+        f":first_place: 1st — {prizes.get('first', 'TBA')}\n"
+        f":second_place: 2nd — {prizes.get('second', 'TBA')}\n"
+        f":third_place: 3rd — {prizes.get('third', 'TBA')}"
     )
-
 
 class WebhookError(Exception):
     """Custom exception for webhook-related errors."""

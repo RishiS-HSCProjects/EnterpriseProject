@@ -78,16 +78,16 @@ select.field-input:focus {
 }
 
 .form-group {
-    margin-bottom: 12px;
+    margin: 12px 0;
 }
 
 .time-info {
-    font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
-    margin: 6px 0 0 0;
+    margin: 0;
     padding: 6px 8px;
+    width: 95%;
     background: rgba(255, 140, 0, 0.05);
-    border-left: 2px solid var(--primary);
+    border-bottom: 1px solid var(--primary);
     border-radius: 3px;
 }
 
@@ -102,21 +102,44 @@ select.field-input:focus {
     margin-top: auto;
 }
 
+.auth-button {
+    transition: all 0.2s ease;
+    display: inline-block;
+    text-align: center;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+}
+
 .auth-button.auth-button-primary {
     background: var(--primary);
     color: var(--text-on-primary-dark);
-    padding: 10px 14px;
-    border-radius: 6px;
-    border: none;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .auth-button.auth-button-primary:hover {
     background: var(--primary-dark);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
+}
+
+.auth-button.auth-button-secondary {
+    background: transparent;
+    color: var(--text-on-background);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.auth-button.auth-button-secondary:hover {
+    border-color: rgba(255, 140, 0, 0.5);
+    color: var(--primary);
+}
+
+.auth-button.auth-button-danger {
+    background: #B42318;
+    color: #fff;
 }
 
 .auth-button.auth-button-primary:disabled,
@@ -139,33 +162,25 @@ select.field-input:focus {
     transform: none;
 }
 
-.auth-button.auth-button-secondary {
-    background: transparent;
-    color: var(--text-on-background);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 10px 12px;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.auth-button.auth-button-secondary:hover {
-    border-color: rgba(255, 140, 0, 0.5);
-    color: var(--primary);
+.leaderboard-heading {
+    margin-bottom: 1px;
 }
 
 .leaderboard-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+    list-style: decimal;
+    padding: 0 0 0 24px;
+    margin: 8px 0;
 }
 
 .leaderboard-list li {
-    padding: 8px 0;
+    padding: 6px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    display: flex;
-    justify-content: space-between;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.leaderboard-list li:hover {
+    color: var(--primary);
 }
 
 @media (max-width: 800px) {

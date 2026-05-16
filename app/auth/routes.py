@@ -2,6 +2,7 @@ from flask import Blueprint, current_app, jsonify, render_template, redirect, ur
 from app import db
 from app.models.tournament import Tournament
 from app.models.user import InvalidPassword, User, UserRole, UserNotFound, UserAlreadyExists
+from app.models.whitelist import UserNotWhitelisted, Whitelist
 from app.utils.utils import (
     flash_all_form_errors, flash, save_form_state, restore_form_state
 )
@@ -30,6 +31,11 @@ def login():
                 flash_all_form_errors(form)
                 save_form_state(form, 'login_form')
                 return redirect(url_for('auth.login'))
+        except UserNotWhitelisted as exc:
+            add_username_error(str(exc))
+            flash_all_form_errors(form)
+            save_form_state(form, 'login_form')
+            return redirect(url_for('auth.login'))
         except Exception as exc:
             current_app.logger.error(f"Unexpected error during user creation: {exc}")
             flash("An unexpected error occurred. Please try again.")
@@ -80,7 +86,7 @@ def handle_registration_pin():
             username=form.username.data,
             password=form.password.data,
         )
-    except (UserAlreadyExists, UserNotFound) as exc:
+    except (UserAlreadyExists, UserNotFound, UserNotWhitelisted) as exc:
         add_username_error(str(exc))
         return fail()
     except InvalidPassword as exc:
@@ -90,7 +96,7 @@ def handle_registration_pin():
         current_app.logger.error(f"Unexpected error during user creation: {exc}")
         add_username_error("An unexpected error occurred. Please try again.")
         return fail(400)
-    
+
     discord_id = player_data.get('discordId', None)
     if not discord_id:
         flash('No Discord account linked to this Minecraft account. Please link your Discord account and try again.', 'error')
@@ -162,6 +168,16 @@ def verify_registration_pin():
         flash('That username is already registered. Please log in.', 'warning')
         return jsonify({"status": "error", "message": "That username is already registered. Please log in."}), 409
 
+    wl = Whitelist.query.filter_by(xuid=pending.get('xuid')).first()
+    if wl:
+        session.pop('pending_registration')
+        flash('This account has already been registered. Please log in.', 'warning')
+        return jsonify({"status": "error", "message": "This account has already been registered. Please log in."}), 409
+    elif not wl:
+        current_app.logger.warning(f"Whitelist entry not found for xuid {pending.get('xuid')} during registration verification.")
+        flash('Whitelist entry not found for this account. Please contact an administrator.', 'error')
+        return fail(403)
+
     user = User()
     user.xuid = pending.get('xuid')
     user.username = pending.get('username')
@@ -174,6 +190,7 @@ def verify_registration_pin():
         return fail()
 
     db.session.add(user)
+    db.session.commit()
 
     for tourn in Tournament.query.filter_by(created_by=user.xuid).all():
         tourn.set_created_by(xuid=user.xuid)

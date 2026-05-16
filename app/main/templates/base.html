@@ -19,7 +19,7 @@
             <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
             {% endfor %}
             {% if current_user.is_authenticated and current_user.is_admin() %}
-            <li><a href="{{ url_for('main.admin_panel') }}" class="{% if request.endpoint == 'main.admin_panel' %}active{% endif %}">Admin</a></li>
+            <li><a href="{{ url_for('admin.panel') }}" class="{% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}">Admin</a></li>
             {% endif %}
         </ul>
     </nav>

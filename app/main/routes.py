@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-
 from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify
 from flask_login import current_user, login_required
 from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes
@@ -96,14 +95,14 @@ def dashboard():
         if tournaments:
             days_ago = max(0, (now_ts - tournaments[-1].end_unix) // 86400)
             kpis.append(KPI(
-                title="Days Since Last Tourney",
+                title="Last Tournament",
                 value=_format_days(days_ago),
                 detail=f"{_format_day_label(days_ago)} ago",
                 hover_text=f"Last tournament: {tournaments[-1].name}"
             ))
         else:
             kpis.append(KPI(
-                title="Days Since Last Tourney",
+                title="Last Tournament",
                 value="0",
                 detail="No tournaments yet",
                 hover_text="Create the first tournament to populate the dashboard."
@@ -131,7 +130,7 @@ def dashboard():
             kpis.append(KPI(
                 title="Last Overall Winner",
                 value=str(winner.score),
-                detail=f"{winner.player} kills",
+                detail=f"{winner.player}",
                 hover_text=f"Top performer from {last_tournament.name}.",
                 href=url_for('main.tournament_editor', tournament_id=last_tournament.id)
             ))
@@ -156,13 +155,13 @@ def dashboard():
 @main_bp.route('/scheduler', methods=['GET', 'POST'])
 def scheduler(open_add_modal=False):
     from app.forms import AddTournamentForm
-    
+
     kwargs = {}
     now = int(datetime.now(UTC).timestamp())
 
     # 1. Fetch Tournament Data
     previous = Tournament.query.filter(Tournament.end_unix < now).order_by(Tournament.end_unix.desc()).limit(2).all() or []
-    
+
     kwargs.update({
         'previous_tournaments': list(reversed(previous)),
         'current_tournament': Tournament.query.filter(Tournament.start_unix <= now, Tournament.end_unix >= now).order_by(Tournament.start_unix.asc()).first(),
@@ -178,7 +177,7 @@ def scheduler(open_add_modal=False):
             # Check for time overlap
             start, end = add_form.start_unix.data, add_form.end_unix.data
             overlap = Tournament.query.filter(Tournament.start_unix < end, Tournament.end_unix > start).first()
-            
+
             if overlap:
                 flash(f'Time overlap with tournament "{overlap.name}"', 'error')
             else:
@@ -199,7 +198,7 @@ def scheduler(open_add_modal=False):
                 )
                 flash('Tournament added successfully!', 'success')
                 return redirect(url_for('main.scheduler'))
-        
+
         elif request.method == 'POST':
             flash_all_form_errors(add_form)
 
@@ -209,17 +208,6 @@ def scheduler(open_add_modal=False):
 
     return render_template('scheduler.html', **kwargs)
 
-@main_bp.route('/admin')
-@login_required
-def admin_panel():
-    if not current_user.is_admin():
-        return "Access denied: Admins only.", 403
-
-    # TODO: Add/remove staff
-    # TODO: See blocked IPs, times, and reasons for blockage.
-
-    return render_template("admin.html")
-
 @main_bp.route('/scheduler/<int:tournament_id>', methods=['GET', 'POST'])
 def tournament_editor(tournament_id: int):
     from app.forms import AddTournamentForm
@@ -227,11 +215,11 @@ def tournament_editor(tournament_id: int):
 
     tourney = Tournament.query.get_or_404(tournament_id)
     kwargs = {'tournament': tourney}
-    if tourney.is_expired and not tourney.tournament_info_discord_status:
+    if not tourney.tournament_info_discord_status and tourney.is_expired:
         tourney.tournament_info_discord_status = True
         db.session.commit()
 
-    form = AddTournamentForm()
+    form = AddTournamentForm(request.form if request.method == 'POST' else None)
     if request.method == 'GET':
         form.name.data = tourney.name
         form.start_unix.data = tourney.start_unix
@@ -369,7 +357,7 @@ def tournament_editor(tournament_id: int):
                             # Format dates
                             issued_date = datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown'
                             end_date = datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown'
-                            
+
                             formatted_punishments.append({
                                 'type': punishment_type.name,
                                 'issued_date': issued_date,
@@ -380,7 +368,7 @@ def tournament_editor(tournament_id: int):
                         # Aggregate player disqualifications
                         if player_name not in all_disqualified_players:
                             all_disqualified_players[player_name] = []
-                        
+
                         all_disqualified_players[player_name].append({
                             'round': r,
                             'punishments': formatted_punishments
@@ -417,7 +405,6 @@ def _relative_logic(ts, now_ts):
     else: amount, unit = abs_diff // 86400, 'd'
     return 'now' if diff == 0 else (f'in {amount}{unit}' if diff > 0 else f'{amount}{unit} ago')
 
-
 @main_bp.route('/scheduler/<int:tournament_id>/discord/send', methods=['POST'])
 @login_required
 def tournament_send_discord(tournament_id: int):
@@ -438,19 +425,20 @@ def tournament_send_discord(tournament_id: int):
     message = (tourney.tournament_info_discord_message or request.form.get('message') or '').strip()
 
     round_hours = max(0.5, round(tourney.round_duration / 3600, 1))
+    round_hours_display = int(round_hours) if float(round_hours).is_integer() else round_hours
     message_content = (
-        f"## :mega: Tournament Announcement\n\n"
+        f"# :mega: {tourney.name} Announcement\n\n"
         f"This tournament will start on <t:{tourney.start_unix}:F> and will conclude on <t:{tourney.end_unix}:F>.\n"
         f"It will finish <t:{tourney.end_unix}:R>.\n\n"
-        f"**Each round will last {round_hours} hour{'' if round_hours == 1 else 's'}.**"
+        f"**Each round will last {round_hours_display} hour{'' if round_hours_display == 1 else 's'}.**"
     )
 
     if message:
-        message_content += f"\n\n### Additional Info\n{message}"
+        message_content += f"\n### Additional Info\n{message}"
 
     message_content += (
-        "\n\nSimply join a Skywars Solos game and play as you would normally do. "
-        "Your kills are automatically counted and tracked at https://ngmc.co/tournament"
+        "\nTo participate, simply play the game as you normally would during the tournament period."
+        "\nYour kills are automatically counted and tracked at https://ngmc.co/tournament."
     )
 
     prizes = getattr(tourney, 'prizes', {}) or {}
@@ -462,17 +450,18 @@ def tournament_send_discord(tournament_id: int):
                 'second': prizes.get('overall_second', 'TBA'),
                 'third': prizes.get('overall_third', 'TBA'),
             })}"
-            "\n\nOverall Ranking rewards the top 3 players across all rounds. Overall Ranking prizes are cumulative with Per-Round Rewards. Tournament rules and prizes are subject to change. Please follow tournament-info for updates."
+            "\n-# Overall Ranking rewards the top 3 players across all rounds. Overall Ranking prizes are cumulative with Per-Round Rewards."
         )
     if any(prizes.get(key) for key in ['round_first', 'round_second', 'round_third']):
         message_content += (
-            "\n\n## :gift: Per-Round Prizes\n"
+            "\n## :gift: Per-Round Prizes\n"
             f"{format_prize_lines({
                 'first': prizes.get('round_first', 'TBA'),
                 'second': prizes.get('round_second', 'TBA'),
                 'third': prizes.get('round_third', 'TBA'),
             })}"
-            "\n\nTitan Rank rewards are not transferable. Per-round Titan Rank rewards are non-cumulative, however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable). Tournament rules and prizes are subject to change. Please follow tournament-info for updates."
+            "\n-# Titan Rank rewards are not transferable. Per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable)."
+            "\n\n We wish you all the best! Please note that tournament rules and prizes are subject to change. Frequent updates will be posted to <#1466960479485296640>, along with <@&1081345603268792410> pings."
         )
 
     try:
@@ -481,10 +470,9 @@ def tournament_send_discord(tournament_id: int):
             content=message_content,
         )
         if ok:
-            # TODO: Enable. Disabled for testing purposes to allow resending
-            # tourney.tournament_info_discord_status = True
-            # from app import db
-            # db.session.commit()
+            tourney.tournament_info_discord_status = True
+            from app import db
+            db.session.commit()
             flash('Discord message sent', 'success')
         else:
             flash('Failed to send Discord message', 'error')
@@ -531,7 +519,7 @@ def tournament_send_prizes_discord(tournament_id: int):
     for round_num in range(1, tourney.round_count + 1):
         entries = tourney.get_leaderboard(round_num=round_num).get_top(3)
         round_sections.append(
-            f"**Round {round_num}**\n{format_placement_lines(entries)}"
+            f"### Round {round_num}\n{format_placement_lines(entries)}"
         )
 
     rounds_text = "\n\n".join(round_sections)
@@ -539,7 +527,7 @@ def tournament_send_prizes_discord(tournament_id: int):
     optional_message = (tourney.tournament_info_discord_message or '').strip()
 
     message = (
-        f"## {tourney.name} Tournament Rewards!\n\n"
+        f"# :mega: {tourney.name} Rewards!\n\n"
     )
 
     if optional_message:
@@ -554,8 +542,11 @@ def tournament_send_prizes_discord(tournament_id: int):
         f"{rounds_text}\n\n"
 
         f"## :gift: **PRIZES**\n"
-        f"-# All prizes have now been distributed. Additions are awarded to accounts automatically.\n\n"
+        f"-# <@&1081345603268792410> All prizes have now been distributed. Additions are awarded to accounts automatically. Thank you for participating in the {tourney.name}!\n\n"
+
+        "### Per-Round Prizes\n"
         f"{format_prize_lines(round_prizes)}\n\n"
+        "### Overall Prizes\n"
         f"{format_prize_lines(overall_prizes)}"
     )
 
@@ -689,5 +680,42 @@ def tournament_cache_stats(tournament_id: int):
         if is_ajax:
             return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 500
         flash(message, 'error')
-    
+
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+@main_bp.route('/scheduler/<int:tournament_id>/delete', methods=['POST'])
+@login_required
+def tournament_delete(tournament_id: int):
+    from app import db
+    if not current_user.is_manager():
+        flash('Access denied: Managers only.', 'error')
+        return redirect(url_for('main.tournament_editor', tournament_id=tournament_id)), 403
+
+    tourney = Tournament.query.get_or_404(tournament_id)
+
+    password = (request.form.get('confirm_password') or '').strip()
+    if not password:
+        flash('Please enter your password to confirm deletion.', 'error')
+        return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+    # Verify current user's password
+    try:
+        if not current_user.check_password(password):
+            flash('Password incorrect. Tournament not deleted.', 'error')
+            return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+    except Exception:
+        flash('Error verifying password. Tournament not deleted.', 'error')
+        return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+    # Perform deletion
+    try:
+        db.session.delete(tourney)
+        db.session.commit()
+        current_app.logger.info('Tournament id=%s name=%s deleted by user id=%s', tourney.id, tourney.name, current_user.id)
+        flash(f'Tournament "{tourney.name}" deleted.', 'success')
+        return redirect(url_for('main.scheduler'))
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Failed to delete tournament id=%s', tourney.id)
+        flash('Failed to delete tournament. Please contact an administrator.', 'error')
+        return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))

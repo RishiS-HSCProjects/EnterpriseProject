@@ -60,7 +60,7 @@
             <!-- Tournament Name -->
             <div class="form-group">
                 {{ add_form.name.label(class="field-label") }}
-                {{ add_form.name(class="field-input") }}
+                {{ add_form.name(class="field-input", placeholder="[MONTH] [GAMEMODE] Kills Tournament") }}
                 {% if add_form.name.errors %}
                     <div class="field-errors">
                         {% for error in add_form.name.errors %}

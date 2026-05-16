@@ -6,7 +6,7 @@ from app import db
 class OtpLog(db.Model):
     """Model to log OTP generation and verification attempts."""
     __tablename__ = 'otp_logs'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     xuid = db.Column(db.String(80), nullable=False)
     hashed_otp_code = db.Column(db.String(6), nullable=False)
@@ -49,7 +49,7 @@ class OtpLog(db.Model):
 
         if valid_log.ip_address != ip_address:
             raise OtpLogInvalidIp("IP address does not match.")
-        
+
         return hashpw(otp_code.encode(), valid_log.hashed_otp_code.encode()) == valid_log.hashed_otp_code.encode()
 
     def __repr__(self):
@@ -74,7 +74,7 @@ class OtpLogInvalidIp(OtpLogError):
 class BlockedIp(db.Model):
     """Model to log blocked IP addresses due to suspicious activity."""
     __tablename__ = 'blocked_ips'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String(45), unique=True, nullable=False)
     blocked_at = db.Column(db.DateTime, nullable=False, default=db.func.now())

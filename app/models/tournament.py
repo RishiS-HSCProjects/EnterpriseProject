@@ -151,13 +151,13 @@ def _archive_punishment(punishment: NormalizedPunishment) -> ArchivedPunishment:
         type=punishment.type,
     )
 
-def _disqualified_players_from_archive(archive_data, tournament_start: int) -> list[dict]:    
+def _disqualified_players_from_archive(archive_data, tournament_start: int) -> list[dict]:
     punishments = []
     if isinstance(archive_data, dict):
         punishments = archive_data.get('punishmentsNew') or archive_data.get('punishments') or []
 
     current_app.logger.debug(f"Archive data contains {len(punishments)} raw punishments")
-    
+
     # Keep the latest BAN and MUTE per player, then apply the time window.
     latest_by_identifier: dict[str, dict[PunishmentType, NormalizedPunishment]] = {}
     for raw_punishment in punishments:

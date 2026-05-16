@@ -19,72 +19,10 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function showRoundLeaderboard() {
-    const select = document.getElementById('round-selector');
-    const selectedRound = select ? select.value : '';
-
-    document.querySelectorAll('[data-round-leaderboard]').forEach((panel) => {
-        panel.hidden = panel.dataset.roundLeaderboard !== selectedRound;
-    });
-}
-
-document.addEventListener('DOMContentLoaded', showRoundLeaderboard);
-</script>
-{% if current_user.is_authenticated %}
-<script>
-async function cacheTournamentStats(event) {
-    event.preventDefault();
-
-    const form = event.currentTarget;
-    const button = form.querySelector('button[type="submit"]');
-    const originalText = button ? button.textContent : 'Cache Stats';
-
-    try {
-        if (button) {
-            button.disabled = true;
-            button.textContent = 'Caching...';
-        }
-        startLoader();
-
-        const formData = new FormData(form);
-        const response = await fetch(form.action, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            },
-            body: new URLSearchParams(formData),
-        });
-
-        const data = await response.json();
-        sendFlashMessage(data.message || 'Caching completed.', data.success ? 'success' : 'error');
-
-        if (data.success) {
-            setTimeout(() => window.location.reload(), 500);
-        }
-    } catch (error) {
-        sendFlashMessage('Unexpected error caching tournament stats.', 'error');
-    } finally {
-        endLoader();
-        if (button) {
-            button.disabled = false;
-            button.textContent = originalText;
-        }
-    }
-}
-</script>
-{% else %}
-<script>
-    function initForm() {
-        const formElements = document.querySelectorAll('input, textarea');
-        formElements.forEach((e) => {
-            e.disabled = true;
-        });
-    }
-    document.addEventListener('DOMContentLoaded', initForm);
-</script>
-{% endif %}
+    <script>
+        window.__isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
+    </script>
+    <script src="{{ url_for('main.static', filename='js/tournament-detail.js') }}"></script>
 {% endblock %}
 
 {% block page_content %}
@@ -227,7 +165,7 @@ async function cacheTournamentStats(event) {
                     {% endif %}
                 </form>
                 {% endif %}
-                <form method="POST" action="{{ url_for('main.tournament_cache_stats', tournament_id=tournament.id) }}" style="display: inline;" onsubmit="cacheTournamentStats(event)">
+                <form id="cache-stats-form" method="POST" action="{{ url_for('main.tournament_cache_stats', tournament_id=tournament.id) }}" style="display: inline;">
                     <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
 
                     {% if cache_stats_locked %}
@@ -249,32 +187,54 @@ async function cacheTournamentStats(event) {
                         </button>
                     {% endif %}
                 </form>
+                {% if current_user.is_manager() %}
+                <button type="button" class="auth-button auth-button-danger delete-tourney-btn">Delete</button>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if current_user.is_manager() %}
+            <!-- Delete confirmation modal -->
+            <div id="delete-modal" class="modal" hidden>
+                <div class="modal-overlay" data-close-modal></div>
+                <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+                    <form id="delete-form" method="POST" action="{{ url_for('main.tournament_delete', tournament_id=tournament.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+                        <h3 id="delete-modal-title" style="margin:0 0 8px 0;">Confirm Delete</h3>
+                        <p style="margin:0 0 12px 0;">Enter your password to confirm deletion of "{{ tournament.name }}".</p>
+                        <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required />
+                        <div style="text-align:right;">
+                            <button type="button" class="auth-button" data-close-modal>Cancel</button>
+                            <button type="submit" class="auth-button auth-button-danger">Delete</button>
+                        </div>
+                    </form>
+                </div>
             </div>
             {% endif %}
         </div>
 
         <div class="editor-right">
-            <h3>Leaderboard - Overall</h3>
+            <h3 class="leaderboard-heading">Leaderboard - Overall</h3>
             {% if leaderboard_overall %}
-                <ol>
+                <ol class="leaderboard-list">
                     {% set entries = leaderboard_overall.get_entries(limit=10) %}
                     {% for p in entries %}
-                        <li>{{ p.player }} — {{ p.score }}</li>
+                        <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }}</li>
                     {% else %}
                         <li>No leaderboard data available.</li>
                     {% endfor %}
                 </ol>
             {% else %}
-                <li>No leaderboard data available.</li>
+                <p>No leaderboard data available.</p>
             {% endif %}
 
             <hr>
-            
-            <h3>Round Leaderboards</h3>
+
+            <h3 class="leaderboard-heading">Round Leaderboards</h3>
             {% if round_leaderboards %}
                 <div class="form-group">
                     <label for="round-selector" class="field-label">Select Round</label>
-                    <select id="round-selector" class="field-input" onchange="showRoundLeaderboard()">
+                    <select id="round-selector" class="field-input">
                         {% for round_data in round_leaderboards %}
                             <option value="{{ round_data.round_num }}" {% if selected_round == round_data.round_num %}selected{% endif %}>
                                 Round {{ round_data.round_num }}
@@ -285,10 +245,10 @@ async function cacheTournamentStats(event) {
 
                 {% for round_data in round_leaderboards %}
                     <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
-                        <h4>Winners</h4>
-                        <ol>
+                        <h4 class="leaderboard-heading">Winners</h4>
+                        <ol class="leaderboard-list">
                             {% for p in round_data.leaderboard.get_top(10) %}
-                                <li>{{ p.player }}: {{ p.score }} kills</li>
+                                <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }} kills</li>
                             {% else %}
                                 <li>No leaderboard data available.</li>
                             {% endfor %}
