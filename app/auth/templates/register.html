@@ -4,18 +4,29 @@
 
 {% block head %}
     {{ super() }}
-    <script src="{{ url_for('auth.static', filename='js/registration.js') }}"></script>
+    <script src="{{ url_for('auth.static', filename='js/register.js') }}"></script>
+
+    <style>
+        small {
+            display: block;
+            text-align: center;
+            color: #adadad;
+            width: 90%;
+            margin: 0 auto 5px;
+        }
+    </style>
 {% endblock %}
 
 {% block form %}
     <h2>Register</h2>
+    <small>Please contact your IT administrator to ensure your staff account has access to this service.</small>
     <div id="registration-state" data-open-pin-modal="{{ 'true' if show_pin_modal else 'false' }}"></div>
-    <form method="POST" action="{{ url_for('auth.register') }}">
+    <form id="register-form">
         {{ form.hidden_tag() }}
 
         <div class="form-group">
             {{ form.username.label(class="field-label") }}
-            {{ form.username(class="field-input") }}
+            {{ form.username(class="field-input", autocomplete="username") }}
             {% if form.username.errors %}
                 <div class="field-errors">
                     {% for error in form.username.errors %}
@@ -27,7 +38,7 @@
 
         <div class="form-group">
             {{ form.password.label(class="field-label") }}
-            {{ form.password(class="field-input") }}
+            {{ form.password(class="field-input", autocomplete="new-password") }}
             {% if form.password.errors %}
                 <div class="field-errors">
                     {% for error in form.password.errors %}
@@ -39,7 +50,7 @@
 
         <div class="form-group">
             {{ form.password_confirm.label(class="field-label") }}
-            {{ form.password_confirm(class="field-input") }}
+            {{ form.password_confirm(class="field-input", autocomplete="new-password") }}
             {% if form.password_confirm.errors %}
                 <div class="field-errors">
                     {% for error in form.password_confirm.errors %}
@@ -60,11 +71,11 @@
             <h3 id="pin-modal-title">Enter Verification PIN</h3>
             <p class="subtitle">Complete registration by entering your 6-digit PIN.</p>
 
-            <form method="POST" action="{{ url_for('auth.verify_registration_pin') }}">
+            <form id="pin-form">
                 {{ verify_form.hidden_tag() }}
                 <div class="form-group">
                     {{ verify_form.pin.label(class="field-label") }}
-                    {{ verify_form.pin(class="field-input", inputmode="numeric", pattern="[0-9]*", maxlength="6") }}
+                    {{ verify_form.pin(class="field-input", inputmode="numeric", pattern="[0-9]*", maxlength="6", autocomplete="one-time-code") }}
                     {% if verify_form.pin.errors %}
                         <div class="field-errors">
                             {% for error in verify_form.pin.errors %}
@@ -75,7 +86,7 @@
                 </div>
                 <div class="form-group">
                     {{ verify_form.password.label(class="field-label") }}
-                    {{ verify_form.password(class="field-input") }}
+                    {{ verify_form.password(class="field-input", autocomplete="current-password") }}
                     {% if verify_form.password.errors %}
                         <div class="field-errors">
                             {% for error in verify_form.password.errors %}

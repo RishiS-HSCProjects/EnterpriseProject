@@ -1,0 +1,102 @@
+#page-content {
+    padding: 1rem 2rem;
+    margin: 20px auto 0;
+    width: 95%;
+    background-color: var(--background-card);
+    height: 80vh;
+    border-radius: 8px;
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) 5fr;
+    grid-template-areas: "sidebar main";
+}
+
+aside {
+    grid-area: sidebar;
+    padding: 1rem;
+    background-color: var(--background-card);
+    border-radius: 8px;
+    display: flex;
+    position: sticky;
+    top: 20px;
+    height: 90vh;
+    overflow: visible;
+    flex-direction: column;
+}
+
+aside #logo img {
+    width: 50%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    margin-bottom: 1rem;
+}
+
+aside nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+}
+
+aside nav ul li {
+    margin: 0.5rem 0;
+}
+
+aside nav ul li a {
+    color: #ffffff;
+    text-decoration: none;
+    font-weight: bold;
+    display: block;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+aside nav ul li a:hover {
+    background-color: var(--primary);
+    color: #ffffff;
+    text-decoration: underline;
+}
+
+aside nav ul li a.active {
+    background-color: var(--primary);
+    color: var(--text-on-primary);
+}
+
+aside nav ul li a.active:hover {
+    background-color: var(--primary-dark);
+    color: var(--text-on-primary);
+    text-decoration: underline;
+}
+
+aside #bottom {
+    margin-top: auto;
+    bottom: 0;
+    text-align: center;
+}
+
+aside #bottom a {
+    font-weight: bold;
+    color: var(--text-on-background)
+}
+
+aside #bottom a:hover {
+    color: var(--primary);
+    text-decoration: underline;
+    cursor: pointer;
+    color: var(--primary)
+}
+
+#main {
+    grid-area: main;
+    padding: 1rem;
+    margin-left: 1rem;
+    background-color: var(--background-card);
+    border-radius: 8px;
+}
+
+#main h1 {
+    margin-top: 0;
+    color: var(--primary);
+    font-size: 3rem;
+}

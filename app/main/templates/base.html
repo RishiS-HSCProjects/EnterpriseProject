@@ -1,0 +1,42 @@
+{% extends "app-container.html" %}
+
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/base.css') }}">
+{% endblock head %}
+
+{% block content %}
+<aside class="sidebar">
+    <div id="logo">
+        <img src="{{ url_for('static', filename='assets/logo/logo-470x620.png') }}" alt="Logo" data-wait-for-load>
+    </div>
+    <nav>
+        <ul>
+            {% set nav_items = [
+                ('main.dashboard', 'Dashboard'),
+                ('main.scheduler', 'Scheduler'),
+            ] %}
+            {% for endpoint, label in nav_items %}
+            <li><a href="{{ url_for(endpoint) }}" class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a></li>
+            {% endfor %}
+            {% if current_user.is_authenticated and current_user.is_admin() %}
+            <li><a href="{{ url_for('admin.panel') }}" class="{% if request.endpoint and request.endpoint.startswith('admin.') %}active{% endif %}">Admin</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <div id="bottom">
+        <div id="account">
+            {% if current_user.is_authenticated %}
+            <a title="Log out" href="{{ url_for('auth.logout') }}">{{ current_user.username }}</a>
+            {% else %}
+            <a title="Click for Registration" href="{{ url_for('auth.login') }}">Login</a>
+            {% endif %}
+        </div>
+    </div>
+</aside>
+
+<div id="main" role="main">
+    <h1>{{ title }}</h1>
+    <hr>
+    {% block page_content %}{% endblock page_content %}
+</div>
+{% endblock content %}

@@ -1,13 +1,12 @@
 import os
 from enum import Enum, auto
-from discord_webhook import DiscordEmbed, DiscordWebhook
+from discord_webhook import DiscordWebhook
 from flask import current_app
-from .utils import flash
 
 class ChannelWebhookUrl(Enum):
     SECURE_WEBHOOK_URL = auto()
     ANNOUNCEMENT_WEBHOOK_URL = auto()
-    
+
     @property
     def url(self) -> str | None:
         mapping = {
@@ -18,16 +17,15 @@ class ChannelWebhookUrl(Enum):
         value = os.getenv(mapping[self])
 
         if value is None:
-            raise TypeError("Webhook URL Type does not exist.")
+            raise WebhookUrlNotFound(f"Webhook URL for {self.name} not found.")
 
         return value
 
 def send(
     location: ChannelWebhookUrl,
-    content: str,
+    content: str = "",
     username: str = "Enterprise Project Bot",
     header: str | None = None,
-    embeds: list[DiscordEmbed] | None = None,
     timeout: int = 10,
 ) -> bool:
     """Send a message to a Discord webhook channel.
@@ -35,33 +33,64 @@ def send(
     Returns True on success, otherwise False.
     """
 
-    if content is None:
-        current_app.logger.warning("No content provided to Discord webhook send()")
-        return False
-
-    message_content = content
     if header:
-        message_content = f"{header}\n{message_content}"
+        content = f"{header}\n{content}"
 
     try:
         webhook = DiscordWebhook(
             url=location.url, # type: ignore
+            content=content,
             username=username,
-            content=message_content,
             timeout=timeout,
         )
 
-        if embeds:
-            for embed in embeds:
-                webhook.add_embed(embed)
-
         response = webhook.execute()
         return response.status_code in (200, 204)
-    except TypeError as exc:
-        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
-        current_app.logger.error("Invalid webhook URL type provided: %s", exc)
-        return False
+    except WebhookUrlNotFound as exc:
+        current_app.logger.error("Webhook URL not found: %s", exc)
+        raise
     except Exception as exc:
-        flash("An error occurred while sending the message to Discord. Please try again later.", "error")
         current_app.logger.exception("error sending message to Discord webhook: %s", exc)
-        return False
+        raise
+
+def format_placement_lines(entries, label: str = 'kills') -> str:
+    """Format leaderboard entries as markdown lines.
+
+    Args:
+        entries: List of leaderboard entry objects with .player and .score attributes
+        label: Label for the score (default: 'kills')
+
+    Returns:
+        Formatted markdown string with numbered placement lines
+    """
+    lines = []
+    for index, entry in enumerate(entries, start=1):
+        lines.append(f"- **{index}. {entry.player}: {entry.score} {label}**")
+    return "\n".join(lines) if lines else "- No data available."
+
+def format_prize_lines(prizes: dict[str, str]) -> str:
+    """Format prize dictionary as markdown lines.
+
+    Args:
+        prizes: Dict with keys 'first', 'second', 'third'
+
+    Returns:
+        Formatted markdown string with prize placements
+    """
+    return (
+        f":first_place: 1st — {prizes.get('first', 'TBA')}\n"
+        f":second_place: 2nd — {prizes.get('second', 'TBA')}\n"
+        f":third_place: 3rd — {prizes.get('third', 'TBA')}"
+    )
+
+class WebhookError(Exception):
+    """Custom exception for webhook-related errors."""
+
+class WebhookUrlNotFound(WebhookError):
+    """Raised when a required webhook URL is not found in environment variables."""
+
+class WebhookSendError(WebhookError):
+    """Raised when sending a message to the webhook fails."""
+
+class InvalidWebhookUrlType(WebhookError):
+    """Raised when an invalid webhook URL type is provided."""

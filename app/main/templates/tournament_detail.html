@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% set title = "Tournament" %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/scheduler.css') }}">
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/tournament.css') }}">
+
+    {% if current_user.is_authenticated %}
+    <style>
+        .field-input:disabled,
+        .field-textarea:disabled {
+            color: rgba(255, 255, 255, 0.7);
+            cursor: not-allowed;
+        }
+    </style>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        window.__isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
+    </script>
+    <script src="{{ url_for('main.static', filename='js/tournament-detail.js') }}"></script>
+{% endblock %}
+
+{% block page_content %}
+<div class="container">
+    <h2>Tournament: {{ tournament.name }}</h2>
+
+    <div class="editor-grid">
+        <div class="editor-left">
+            <form method="POST" id="tournament-edit-form">
+                {% if current_user.is_authenticated %}
+                {{ form.hidden_tag() }}
+                {% endif %}
+
+                <div class="form-group">
+                    {{ form.name.label(class="field-label") }}
+                    {{ form.name(class="field-input") }}
+                </div>
+
+                <div class="form-group">
+                    {{ form.start_unix.label(class="field-label") }}
+                    {{ form.start_unix(class="field-input") }}
+                    <p class="time-info" title="{{ epoch_details.start_local_title }} | {{ epoch_details.start_relative_title }}">
+                        {{ epoch_details.start_gmt }}
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    {{ form.end_unix.label(class="field-label") }}
+                    {{ form.end_unix(class="field-input") }}
+                    <p class="time-info" title="{{ epoch_details.end_local_title }} | {{ epoch_details.end_relative_title }}">
+                        {{ epoch_details.end_gmt }}
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    {{ form.round_count.label(class="field-label") }}
+                    {{ form.round_count(class="field-input") }}
+                </div>
+
+                <div class="form-group">
+                    {{ form.discord_message.label(class="field-label") }}
+                    {% if current_user.is_authenticated and tournament.tournament_info_discord_status %}
+                        {{ form.discord_message(class="field-textarea", disabled=True, title="Locked because the tournament announcement has already been sent.") }}
+                    {% else %}
+                        {{ form.discord_message(class="field-textarea") }}
+                    {% endif %}
+                </div>
+
+                <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: 12px;">
+                    <h4 style="font-size: 14px; font-weight: 600; margin: 0 0 8px 0;">Round Prizes</h4>
+                    <div class="form-group">
+                        {{ form.round_first_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.round_first_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.round_first_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ form.round_second_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.round_second_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.round_second_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ form.round_third_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.round_third_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.round_third_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: 12px;">
+                    <h4 style="font-size: 14px; font-weight: 600; margin: 0 0 8px 0;">Global Prizes</h4>
+                    <div class="form-group">
+                        {{ form.global_first_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.global_first_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.global_first_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ form.global_second_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.global_second_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.global_second_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                    <div class="form-group">
+                        {{ form.global_third_prize.label(class="field-label") }}
+                        {% if current_user.is_authenticated and tournament.awards_distributed %}
+                            {{ form.global_third_prize(class="field-input", disabled=True, title="Locked because the prizes announcement has already been sent.") }}
+                        {% else %}
+                            {{ form.global_third_prize(class="field-input") }}
+                        {% endif %}
+                    </div>
+                </div>
+
+            </form>
+
+            {% if current_user.is_authenticated %}
+            <div class="auth-actions">
+                <button type="submit" form="tournament-edit-form" class="auth-button auth-button-primary">{{ form.submit.label.text }}</button>
+                {% if current_user.is_authenticated and current_user.is_manager() %}
+                <form method="POST" action="{{ url_for('main.tournament_send_discord', tournament_id=tournament.id) }}" style="display: inline;">
+                    {% if tournament.tournament_info_discord_status or tournament.is_expired %}
+                        <button
+                            type="submit"
+                            class="auth-button auth-button-secondary"
+                            disabled
+                            title="{% if tournament.tournament_info_discord_status %}Locked because this announcement has already been sent.{% else %}Locked because the tournament has ended.{% endif %}"
+                        >Announcement Locked</button>
+                    {% else %}
+                        <button type="submit" class="auth-button auth-button-secondary">Send to Discord</button>
+                    {% endif %}
+                </form>
+                <form method="POST" action="{{ url_for('main.tournament_send_prizes_discord', tournament_id=tournament.id) }}" style="display: inline;">
+                    {% if not tournament.is_expired %}
+                        <button
+                            type="submit"
+                            class="auth-button auth-button-secondary"
+                            disabled
+                            title="Locked until the tournament has ended."
+                        >Send Prizes Announcement</button>
+                    {% elif tournament.awards_distributed %}
+                        <button
+                            type="submit"
+                            class="auth-button auth-button-secondary"
+                            disabled
+                            title="Locked because the prizes announcement has already been sent."
+                        >Prizes Announcement Locked</button>
+                    {% else %}
+                        <button type="submit" class="auth-button auth-button-secondary">Send Prizes Announcement</button>
+                    {% endif %}
+                </form>
+                {% endif %}
+                <form id="cache-stats-form" method="POST" action="{{ url_for('main.tournament_cache_stats', tournament_id=tournament.id) }}" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+
+                    {% if cache_stats_locked %}
+                        <button
+                            type="submit"
+                            class="auth-button auth-button-secondary"
+                            disabled
+                            title="Locked because all finished round stats have already been cached."
+                        >
+                            Cache Stats Locked
+                        </button>
+                    {% elif not tournament.is_upcoming %}
+                        <button
+                            type="submit"
+                            class="auth-button auth-button-secondary"
+                            title="Cache finished round stats into the tournament archive."
+                        >
+                            Cache Stats
+                        </button>
+                    {% endif %}
+                </form>
+                {% if current_user.is_manager() %}
+                <button type="button" class="auth-button auth-button-danger delete-tourney-btn">Delete</button>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if current_user.is_manager() %}
+            <!-- Delete confirmation modal -->
+            <div id="delete-modal" class="modal" hidden>
+                <div class="modal-overlay" data-close-modal></div>
+                <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+                    <form id="delete-form" method="POST" action="{{ url_for('main.tournament_delete', tournament_id=tournament.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+                        <h3 id="delete-modal-title" style="margin:0 0 8px 0;">Confirm Delete</h3>
+                        <p style="margin:0 0 12px 0;">Enter your password to confirm deletion of "{{ tournament.name }}".</p>
+                        <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required />
+                        <div style="text-align:right;">
+                            <button type="button" class="auth-button" data-close-modal>Cancel</button>
+                            <button type="submit" class="auth-button auth-button-danger">Delete</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="editor-right">
+            <h3 class="leaderboard-heading">Leaderboard - Overall</h3>
+            {% if leaderboard_overall %}
+                <ol class="leaderboard-list">
+                    {% set entries = leaderboard_overall.get_entries(limit=10) %}
+                    {% for p in entries %}
+                        <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }}</li>
+                    {% else %}
+                        <li>No leaderboard data available.</li>
+                    {% endfor %}
+                </ol>
+            {% else %}
+                <p>No leaderboard data available.</p>
+            {% endif %}
+
+            <hr>
+
+            <h3 class="leaderboard-heading">Round Leaderboards</h3>
+            {% if round_leaderboards %}
+                <div class="form-group">
+                    <label for="round-selector" class="field-label">Select Round</label>
+                    <select id="round-selector" class="field-input">
+                        {% for round_data in round_leaderboards %}
+                            <option value="{{ round_data.round_num }}" {% if selected_round == round_data.round_num %}selected{% endif %}>
+                                Round {{ round_data.round_num }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% for round_data in round_leaderboards %}
+                    <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
+                        <h4 class="leaderboard-heading">Winners</h4>
+                        <ol class="leaderboard-list">
+                            {% for p in round_data.leaderboard.get_top(10) %}
+                                <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }} kills</li>
+                            {% else %}
+                                <li>No leaderboard data available.</li>
+                            {% endfor %}
+                        </ol>
+                    </section>
+                {% endfor %}
+            {% else %}
+                <p>No round leaderboards available yet.</p>
+            {% endif %}
+
+            {% if all_disqualified_players %}
+            <hr>
+
+            <h3 style="color: #ff8c00;">Disqualified Players</h3>
+            <div style="background: rgba(255, 140, 0, 0.05); padding: 16px; border-radius: 4px;">
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for player_name, disq_rounds in all_disqualified_players.items() %}
+                        <li style="margin-bottom: 16px; padding: 12px; background: rgba(255, 140, 0, 0.08); border-left: 3px solid #ff8c00; border-radius: 2px;">
+                            <strong>{{ player_name }}</strong>
+                            {% for round_entry in disq_rounds %}
+                                <br>
+                                <small style="color: #bbb;">Round {{ round_entry.round }}:</small>
+                                {% for punishment in round_entry.punishments %}
+                                    <br>
+                                    <span style="font-size: 0.9em;">
+                                        <strong>{{ punishment.type }}</strong>: Issued {{ punishment.issued_date }} — Expires {{ punishment.end_date }}
+                                    </span>
+                                    <br>
+                                    <small style="color: #999;">Reason: {{ punishment.reason }}</small>
+                                {% endfor %}
+                            {% endfor %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
