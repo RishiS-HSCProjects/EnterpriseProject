@@ -162,14 +162,8 @@ def verify_registration_pin():
             verify_form.pin.errors = [*verify_form.pin.errors, "Invalid PIN. Please try again."]
             return fail()
 
-    existing_user = User.query.filter_by(username=pending.get('username')).first()
-    if existing_user:
-        session.pop('pending_registration')
-        flash('That username is already registered. Please log in.', 'warning')
-        return jsonify({"status": "error", "message": "That username is already registered. Please log in."}), 409
-
     wl = Whitelist.query.filter_by(xuid=pending.get('xuid')).first()
-    if wl:
+    if wl and wl.get_user():
         session.pop('pending_registration')
         flash('This account has already been registered. Please log in.', 'warning')
         return jsonify({"status": "error", "message": "This account has already been registered. Please log in."}), 409

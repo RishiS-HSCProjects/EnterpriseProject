@@ -9,7 +9,7 @@ class OtpLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     xuid = db.Column(db.String(80), nullable=False)
-    hashed_otp_code = db.Column(db.String(6), nullable=False)
+    hashed_otp_code = db.Column(db.String(128), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=db.func.now())
     ip_address = db.Column(db.String(45), nullable=True)
 

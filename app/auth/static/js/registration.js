@@ -16,5 +16,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     initializeModal(modal, shouldOpenModal, pinInput);
 
-    if (shouldOpenModal) stopLoader();
+    if (shouldOpenModal) endLoader();
 });

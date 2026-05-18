@@ -1,4 +1,3 @@
-from glob import escape
 from flask import current_app
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -83,7 +82,7 @@ class User(UserMixin, db.Model):
     @classmethod
     def get_player_data(cls, username):
         """Get player data from NetherGames API. Accepts username and XUID"""
-        username = escape(username.strip())
+        username = username.strip()
         try:
             response = request(f"players/{username}")
             if not response:
@@ -129,7 +128,7 @@ class User(UserMixin, db.Model):
         - dict of user API data
         """
 
-        username = escape(username.strip())
+        username = username.strip()
         user = cls.query.filter_by(username=username).first()
         if user: raise UserAlreadyExists(username)
 

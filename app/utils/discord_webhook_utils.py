@@ -23,7 +23,7 @@ class ChannelWebhookUrl(Enum):
 
 def send(
     location: ChannelWebhookUrl,
-    content: str | None = None,
+    content: str = "",
     username: str = "Enterprise Project Bot",
     header: str | None = None,
     timeout: int = 10,
@@ -33,15 +33,14 @@ def send(
     Returns True on success, otherwise False.
     """
 
-    message_content = content
     if header:
-        message_content = f"{header}\n{message_content}"
+        content = f"{header}\n{content}"
 
     try:
         webhook = DiscordWebhook(
             url=location.url, # type: ignore
+            content=content,
             username=username,
-            content=message_content,
             timeout=timeout,
         )
 
@@ -53,7 +52,6 @@ def send(
     except Exception as exc:
         current_app.logger.exception("error sending message to Discord webhook: %s", exc)
         raise
-
 
 def format_placement_lines(entries, label: str = 'kills') -> str:
     """Format leaderboard entries as markdown lines.

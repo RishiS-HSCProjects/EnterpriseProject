@@ -49,9 +49,6 @@ def create_app():
     migrate = Migrate(app, db)
     login_manager.init_app(app)
 
-    with app.app_context():
-        db.create_all()
-
     from app.auth.routes import auth_bp
     app.register_blueprint(auth_bp)
     from app.main.routes import main_bp

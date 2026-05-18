@@ -1,4 +1,3 @@
-from re import escape
 from flask import current_app
 from flask_login import current_user
 from app import db
@@ -35,7 +34,7 @@ class Whitelist(db.Model):
     def whitelist_user(cls, username: str) -> "Whitelist":
         from app.models.user import User
 
-        username = escape(username.strip())
+        username = username.strip()
         excepted, data = User.validate_user(username)
 
         if not excepted:
@@ -46,15 +45,15 @@ class Whitelist(db.Model):
             from app.models.user import UserNotFound
             raise UserNotFound(f"User {username} not found in NetherGames API.")
 
+        username = data.get('name') # Handle for casing
+
         existing: Whitelist | None = cls.query.filter_by(xuid=xuid).first()
-        if not existing:
-            existing = cls.query.filter_by(xuid=xuid).first()
         if existing:
             raise UserAlreadyWhitelisted(username)
 
         whitelist_entry = cls()
         whitelist_entry.xuid = xuid
-        whitelist_entry.username = data.get('name') # Handle for casing
+        whitelist_entry.username = username
         whitelist_entry.whitelisted_by = current_user.id
         return whitelist_entry
 

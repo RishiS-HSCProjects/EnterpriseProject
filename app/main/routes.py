@@ -551,19 +551,20 @@ def tournament_send_prizes_discord(tournament_id: int):
     )
 
     try:
-        discord_send(
+        ok = discord_send(
             location=ChannelWebhookUrl.ANNOUNCEMENT_WEBHOOK_URL,
             content=message
         )
+        if ok:
+            tourney.awards_distributed = True
+            from app import db
+            db.session.commit()
+            flash('Prize announcement sent', 'success')
+        else:
+            flash('Failed to send Discord message')
     except Exception:
         flash('Error sending Discord message. Please contact an administrator.', 'error')
-        return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 
-    tourney.awards_distributed = True
-    from app import db
-    db.session.commit()
-
-    flash('Prize announcement sent', 'success')
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 
 @main_bp.route('/scheduler/<int:tournament_id>/cache/stats', methods=['POST'])

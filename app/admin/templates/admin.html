@@ -37,7 +37,7 @@
         </div>
     </div>
     {% if whitelist_entries %}
-        <div class="admin-table-wrapper">
+        <div class="admin-table-wrapper" id="table-whitelist">
             <table class="admin-table">
                 <thead>
                     <tr>
@@ -54,9 +54,9 @@
                         <tr>
                             <td>{{ entry.username }}</td>
                             <td>{{ entry.xuid }}</td>
-                            <td>{{ 'Yes' if entry.xuid else 'No' }}</td>
+                            <td>{{ 'Yes' if entry.get_user() else 'No' }}</td>
                             <td {% if entry.get_user().last_login_at %}title="Time provided in UTC"{% endif %}>
-                                {{ (entry.get_user().last_login_at.strftime('%Y-%m-%d %H:%M')) if entry.get_user().last_login_at else 'NEVER' }}
+                                {{ (entry.get_user().last_login_at.strftime('%Y-%m-%d %H:%M')) if entry.get_user() and entry.get_user().last_login_at else 'NEVER' }}
                             </td>
                             <td {% if entry.whitelisted_at %}title="Time provided in UTC"{% endif %}>
                                 {{ entry.whitelisted_at.strftime('%Y-%m-%d %H:%M') if entry.whitelisted_at else 'N/A' }}
@@ -109,7 +109,7 @@
         </div>
     </div>
     {% if blocked_ips %}
-        <div class="admin-table-wrapper">
+        <div class="admin-table-wrapper" id="table-blocked_ips">
             <table class="admin-table">
                 <thead>
                     <tr>
