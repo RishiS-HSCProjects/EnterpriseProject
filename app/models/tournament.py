@@ -722,11 +722,9 @@ class Tournament(db.Model):
         user = User.query.filter_by(xuid=xuid).first()
         current_app.logger.info(f"Setting created_by for tournament '{self.name}' to XUID {xuid} (User found: {bool(user)})")
         if user:
-            self.created_by = user.id
-        elif kwargs.get('delete_user'):
-            self.created_by = None
-        else:
-            raise ValueError(f"No user found with XUID {xuid}")
+            if kwargs.get('delete_user'): self.created_by = None
+            else: self.created_by = user.id
+        else: raise ValueError(f"No user found with XUID {xuid}")
 
         self.created_by_xuid = xuid
 

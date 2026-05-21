@@ -603,8 +603,8 @@ def tournament_send_prizes_discord(tournament_id: int):
 
 @main_bp.route('/scheduler/<int:tournament_id>/cache/stats', methods=['POST'])
 def tournament_cache_stats(tournament_id: int):
-    if not (current_user and current_user.is_manager()):
-        return jsonify({'success': False, 'message': 'Access denied. Managers only.'}), 403
+    if not current_user:
+        return jsonify({'success': False, 'message': 'Access denied. Please log in.'}), 403
 
     tourney = Tournament.query.get_or_404(tournament_id)
     current_app.logger.info(
@@ -662,15 +662,8 @@ def tournament_cache_stats(tournament_id: int):
         cached_rounds = sorted(after_rounds - before_rounds)
 
         if cached_rounds:
-            message = f"Successfully cached {_format_rounds(cached_rounds)}"
-            current_app.logger.info(
-                "Cache stats success for tournament id=%s: cached_rounds=%s failed_rounds=%s",
-                tourney.id,
-                cached_rounds,
-                failed_rounds,
-            )
-
-            return jsonify({'success': True, 'message': message, 'cached_rounds': cached_rounds, 'failed_rounds': failed_rounds})
+            flash(f"Successfully cached {_format_rounds(cached_rounds)}", 'success')
+            return jsonify({'success': True})
         elif failed_rounds:
             message = f"Failed to cache {_format_rounds(failed_rounds)}"
             current_app.logger.error(

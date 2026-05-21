@@ -142,10 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                sendFlashMessage(data.message || 'Caching completed.', data.success ? 'success' : 'error');
-
                 if (data.success) {
-                    setTimeout(() => window.location.reload(), 500);
+                    window.location.reload()
                 }
             } catch (error) {
                 console.error('Unexpected error caching tournament stats:', error);
