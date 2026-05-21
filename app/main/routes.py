@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify
 from flask_login import current_user, login_required
-from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes
+from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes, RewardPackageTypes
 from app.utils.utils import flash, flash_all_form_errors, restore_form_state, save_form_state
 from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_lines, format_prize_lines, send as discord_send
 from time import time
@@ -36,6 +36,10 @@ def dashboard():
         hours = total_seconds // 3600
         remainder = total_seconds % 3600
         minutes = remainder // 60
+
+        if not minutes: # Falsy minute value '0'
+            return f"{hours}h"
+
         return f"{hours}h {minutes}m"
 
     now_ts = int(datetime.now(UTC).timestamp())
@@ -176,28 +180,36 @@ def scheduler(open_add_modal=False):
         if add_form.validate_on_submit():
             # Check for time overlap
             start, end = add_form.start_unix.data, add_form.end_unix.data
-            overlap = Tournament.query.filter(Tournament.start_unix < end, Tournament.end_unix > start).first()
+            rounds = add_form.round_count.data
 
-            if overlap:
-                flash(f'Time overlap with tournament "{overlap.name}"', 'error')
+            if start is None or end is None or rounds is None:
+                flash('Please provide valid tournament dates and round count.', 'error')
             else:
-                Tournament.create(
-                    name=(add_form.name.data or '').strip(),
-                    start_unix=start,
-                    end_unix=end,
-                    round_count=add_form.round_count.data,
-                    created_by=current_user.id,
-                    prizes=TournamentPrizes(
-                        overall_first=(add_form.global_first_prize.data or '').strip(),
-                        overall_second=(add_form.global_second_prize.data or '').strip(),
-                        overall_third=(add_form.global_third_prize.data or '').strip(),
-                        round_first=(add_form.round_first_prize.data or '').strip(),
-                        round_second=(add_form.round_second_prize.data or '').strip(),
-                        round_third=(add_form.round_third_prize.data or '').strip(),
+                start = int(start)
+                end = int(end)
+                rounds = int(rounds)
+                overlap = Tournament.query.filter(Tournament.start_unix < end, Tournament.end_unix > start).first()
+
+                if overlap:
+                    flash(f'Time overlap with tournament "{overlap.name}"', 'error')
+                else:
+                    Tournament.create(
+                        name=(add_form.name.data or '').strip(),
+                        start_unix=start,
+                        end_unix=end,
+                        round_count=rounds,
+                        created_by=current_user.id,
+                        prizes=TournamentPrizes(
+                            overall_first=(add_form.global_first_prize.data or '').strip(),
+                            overall_second=(add_form.global_second_prize.data or '').strip(),
+                            overall_third=(add_form.global_third_prize.data or '').strip(),
+                            round_first=(add_form.round_first_prize.data or '').strip(),
+                            round_second=(add_form.round_second_prize.data or '').strip(),
+                            round_third=(add_form.round_third_prize.data or '').strip(),
+                        )
                     )
-                )
-                flash('Tournament added successfully!', 'success')
-                return redirect(url_for('main.scheduler'))
+                    flash('Tournament added successfully!', 'success')
+                    return redirect(url_for('main.scheduler'))
 
         elif request.method == 'POST':
             flash_all_form_errors(add_form)
@@ -241,6 +253,14 @@ def tournament_editor(tournament_id: int):
 
         if form.validate_on_submit():
             start, end, rounds = form.start_unix.data, form.end_unix.data, form.round_count.data
+
+            if start is None or end is None or rounds is None:
+                flash('Please provide valid tournament dates and round count.', 'error')
+                return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+            start = int(start)
+            end = int(end)
+            rounds = int(rounds)
 
             overlap = Tournament.query.filter(
                 Tournament.id != tourney.id,
@@ -384,6 +404,7 @@ def tournament_editor(tournament_id: int):
         'all_disqualified_players': all_disqualified_players,
         'selected_round': current_round or (round_numbers[-1] if round_numbers else None),
         'cache_stats_locked': tourney.is_archived(),
+        'reward_package_options': list(RewardPackageTypes),
         'epoch_details': {
             'start_gmt': start_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'end_gmt': end_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
@@ -395,6 +416,20 @@ def tournament_editor(tournament_id: int):
     })
 
     return render_template('tournament_detail.html', **kwargs)
+
+@main_bp.route('/scheduler/<int:tournament_id>/package/stats', methods=['GET', 'POST'])
+@login_required
+def tournament_package_stats(tournament_id: int):
+    """ Package stats in a SQL tuple form. """
+    if not current_user.is_manager():
+        return jsonify({'success': False, 'message': 'Access denied. Managers only.'})
+
+    if not (tourney := Tournament.query.get_or_404(tournament_id)):
+        return jsonify({'success': False, 'message': f'Tournament {tournament_id} not found.'})
+
+    current_app.logger.info(request.method)
+    packages = tourney.get_reward_packages(type=request.args.get('type', None))
+    return jsonify({'success': True, 'packages': packages})
 
 def _relative_logic(ts, now_ts):
     diff = ts - now_ts

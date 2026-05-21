@@ -20,6 +20,101 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(url, '_blank');
     };
 
+    function renderRewardPackages(packages) {
+        const list = document.getElementById('reward-packages-list');
+        if (!list) return;
+
+        const status = document.getElementById('reward-packages-status');
+
+        if (!Array.isArray(packages) || !packages.length) {
+            if (status) status.textContent = 'No packages available yet.';
+            return;
+        }
+
+        packages.forEach((packageItem) => {
+            const item = document.createElement('li');
+            item.className = 'reward-package-card';
+
+            const title = document.createElement('div');
+            title.className = 'reward-package-title';
+            title.textContent = packageItem.reward_label || packageItem.reward_type || 'Package';
+            item.appendChild(title);
+
+            const row = document.createElement('div');
+            row.className = 'reward-package-row';
+            item.appendChild(row);
+
+            const meta = document.createElement('div');
+            meta.className = 'reward-package-meta';
+            meta.textContent = packageItem.display_text || 'No recipients';
+            row.appendChild(meta);
+
+            const copyButton = document.createElement('button');
+            copyButton.type = 'button';
+            copyButton.className = 'reward-package-copy';
+            copyButton.textContent = 'Copy';
+            copyButton.dataset.copyText = packageItem.copy_text || '';
+
+            if (Array.isArray(packageItem.unresolved_players) && packageItem.unresolved_players.length) {
+                const note = document.createElement('div');
+                note.className = 'reward-package-note';
+                note.textContent = 'Skipped: ' + packageItem.unresolved_players.join(', ');
+                item.appendChild(note);
+            } else {
+                row.appendChild(copyButton);
+            }
+
+            list.appendChild(item);
+        });
+
+        list.querySelectorAll('.reward-package-copy').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const copyText = button.dataset.copyText || '';
+                if (!copyText) return;
+
+                try {
+                    await navigator.clipboard.writeText(copyText);
+                    const originalText = button.textContent;
+                    button.textContent = 'Copied!';
+                    sendFlashMessage('Copied to clipboard.', 'success');
+                } catch (error) {
+                    sendFlashMessage('Failed to copy. Please try manually.', 'error');
+                    console.error('Clipboard copy failed: ', error);
+                }
+            });
+        });s
+    }
+
+    async function loadRewardPackages(type = null) { // type='round'; type='global';
+        const panel = document.getElementById('reward-packages-panel');
+        if (!panel) return;
+
+        const status = document.getElementById('reward-packages-status');
+        const packageUrl = panel.dataset.packageUrl;
+        if (!packageUrl) {
+            if (status) status.textContent = 'Package endpoint unavailable.';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${packageUrl}?type=${encodeURIComponent(type)}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest', // For AJAX flag
+                }
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                renderRewardPackages(data.packages);
+            } else if (status) {
+                status.textContent = 'Unable to load packages';
+                sendFlashMessage(data.message || 'Unable to load packages', 'error')
+            }
+        } catch (error) {
+            console.error(`Error ${status || ''}`) 
+        }
+    }
+
     // Cache tournament stats form handler (AJAX)
     const cacheForm = document.getElementById('cache-stats-form');
     if (cacheForm) {
@@ -49,17 +144,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 let data = {};
                 try {
                     data = await response.json();
-                } catch (e) {
-                    // ignore
-                }
+                } catch (e) { /* Ignore */ }
 
-                if (typeof sendFlashMessage === 'function') sendFlashMessage(data.message || 'Caching completed.', data.success ? 'success' : 'error');
+                sendFlashMessage(data.message || 'Caching completed.', data.success ? 'success' : 'error');
 
                 if (data.success) {
                     setTimeout(() => window.location.reload(), 500);
                 }
             } catch (error) {
-                if (typeof sendFlashMessage === 'function') sendFlashMessage('Unexpected error caching tournament stats.', 'error');
+                sendFlashMessage('Unexpected error caching tournament stats.', 'error');
             } finally {
                 if (typeof endLoader === 'function') endLoader();
                 if (button) {
@@ -69,6 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    loadRewardPackages('round');
+    loadRewardPackages('global');
 
     // Delete modal wiring: use centralized setupFormModal if available
     const deleteModal = document.getElementById('delete-modal');

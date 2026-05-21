@@ -183,6 +183,78 @@ select.field-input:focus {
     color: var(--primary);
 }
 
+.reward-packages-panel {
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.reward-packages-heading {
+    margin: 0 0 8px 0;
+    color: var(--primary);
+}
+
+.reward-packages-status {
+    margin-bottom: 10px;
+    color: var(--text-on-background-secondary);
+}
+
+.reward-packages-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.reward-package-card {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--primary);
+    background: rgba(255, 140, 0, 0.05);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reward-package-title {
+    font-weight: 600;
+}
+
+.reward-package-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reward-package-meta {
+    flex: 1 1 auto;
+    color: var(--text-on-background-secondary);
+    font-size: 0.95rem;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.reward-package-copy {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-on-background);
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.reward-package-copy:hover {
+    border-color: rgba(255, 140, 0, 0.5);
+    color: var(--primary);
+}
+
+.reward-package-note {
+    width: 100%;
+    margin-top: 6px;
+    color: #c7a45b;
+    font-size: 0.92rem;
+}
+
 @media (max-width: 800px) {
     .editor-grid {
         grid-template-columns: 1fr;

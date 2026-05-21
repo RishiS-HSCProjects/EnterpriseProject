@@ -207,6 +207,15 @@ class AggregationMethod(Enum):
     SUM = 'sum'              # Total score across all rounds
     BEST_RANK = 'best_rank'  # Best placement rank
 
+class RewardPackageTypes(Enum):
+    """Supported reward packaging targets."""
+    ROUND_FIRSTS = 'round_firsts'
+    ROUND_SECONDS = 'round_seconds'
+    ROUND_THIRDS = 'round_thirds'
+    GLOBAL_FIRST = 'global_first'
+    GLOBAL_SECOND = 'global_second'
+    GLOBAL_THIRD = 'global_third'
+
 @dataclass
 class LeaderboardEntry:
     """Single leaderboard entry: player and their score."""
@@ -256,6 +265,20 @@ class TournamentLeaderboard:
                     player = entry.get('player') if isinstance(entry, dict) else None
                     if player and player not in self._best_ranks and player not in self._disqualified_players:
                         self._best_ranks[player] = rank
+
+        reward_packages = archives.get('rewardPackages') if isinstance(archives, dict) else None
+        round_best = reward_packages.get('round_best') if isinstance(reward_packages, dict) else None
+        if isinstance(round_best, dict):
+            for cached_entry in round_best.values():
+                if not isinstance(cached_entry, dict):
+                    continue
+                player = cached_entry.get('player')
+                rank = cached_entry.get('rank')
+                if not isinstance(player, str) or not player or not isinstance(rank, int):
+                    continue
+                current_rank = self._best_ranks.get(player)
+                if current_rank is None or rank < current_rank:
+                    self._best_ranks[player] = rank
 
         self._loaded = True
 
@@ -390,6 +413,188 @@ class Tournament(db.Model):
         self.archives = archives
         return archives['rounds']
 
+    def _resolve_player_xuid(self, player: str) -> str | None:
+        """Resolve a player name to an XUID, preferring the local user record."""
+        from app.models.user import User
+
+        user = User.query.filter_by(username=player).first()
+        if user and user.xuid:
+            return str(user.xuid)
+
+        try:
+            player_data = User.get_player_data(player)
+        except Exception as exc:
+            current_app.logger.debug("Unable to resolve XUID for player %s: %s", player, exc)
+            return None
+
+        xuid = str(player_data.get('xuid') or '')
+        return xuid or None
+
+    def _reward_package_cache(self) -> dict:
+        """Return the archive section that stores packaged reward candidates."""
+        archives = self.archives or {}
+        if not isinstance(archives, dict):
+            archives = {}
+
+        reward_packages = archives.get('rewardPackages')
+        if not isinstance(reward_packages, dict):
+            reward_packages = {}
+            archives['rewardPackages'] = reward_packages
+            self.archives = archives
+
+        return reward_packages
+
+    def _update_reward_package_cache(self, round_num: int, round_data: dict) -> None:
+        """Persist the best per-round placements by XUID while archiving a round."""
+        reward_packages = self._reward_package_cache()
+        round_best = reward_packages.get('round_best')
+        if not isinstance(round_best, dict):
+            round_best = {}
+
+        round_entries = sorted(
+            _leaderboard_entries(round_data, _round_disqualified_players(round_data)),
+            key=lambda entry: entry.score,
+            reverse=True,
+        )[:3]
+
+        for rank, entry in enumerate(round_entries, start=1):
+            xuid = self._resolve_player_xuid(entry.player)
+            if not xuid:
+                continue
+
+            current_entry = round_best.get(xuid)
+            current_rank = current_entry.get('rank') if isinstance(current_entry, dict) else None
+            current_round = current_entry.get('round') if isinstance(current_entry, dict) else None
+            if current_rank is None or rank < current_rank or (rank == current_rank and (current_round is None or round_num < current_round)):
+                round_best[xuid] = {
+                    'player': entry.player,
+                    'xuid': xuid,
+                    'rank': rank,
+                    'round': round_num,
+                    'score': entry.score,
+                }
+
+        reward_packages['round_best'] = round_best
+        archives = self.archives or {}
+        if not isinstance(archives, dict):
+            archives = {}
+        archives['rewardPackages'] = reward_packages
+        self.archives = archives
+
+    def get_reward_package(self, reward_type: str) -> dict[str, object]:
+        """Package reward recipients for a selected reward type from cached archive data."""
+        normalized_reward_type = (reward_type or '').strip().lower()
+        reward_type_map = {
+            RewardPackageTypes.ROUND_FIRSTS.value: ('round', 1),
+            RewardPackageTypes.ROUND_SECONDS.value: ('round', 2),
+            RewardPackageTypes.ROUND_THIRDS.value: ('round', 3),
+            RewardPackageTypes.GLOBAL_FIRST.value: ('global', 1),
+            RewardPackageTypes.GLOBAL_SECOND.value: ('global', 2),
+            RewardPackageTypes.GLOBAL_THIRD.value: ('global', 3),
+        }
+
+        if normalized_reward_type not in reward_type_map:
+            raise ValueError(f"Unsupported reward type: {reward_type}")
+
+        reward_scope, target_rank = reward_type_map[normalized_reward_type]
+        package_entries: list[dict[str, object]] = []
+        unresolved_players: list[str] = []
+
+        if reward_scope == 'round':
+            reward_packages = self._reward_package_cache()
+            round_best = reward_packages.get('round_best') if isinstance(reward_packages, dict) else {}
+            if not isinstance(round_best, dict):
+                round_best = {}
+
+            cached_entries = [
+                entry
+                for entry in round_best.values()
+                if isinstance(entry, dict) and entry.get('rank') == target_rank and isinstance(entry.get('xuid'), str)
+            ]
+            cached_entries.sort(key=lambda entry: (entry.get('round', 0), str(entry.get('player', '')).lower()))
+
+            for entry in cached_entries:
+                package_entries.append({
+                    'player': entry.get('player', ''),
+                    'xuid': entry.get('xuid', ''),
+                    'rank': entry.get('rank', target_rank),
+                    'round': entry.get('round'),
+                })
+        else:
+            overall_entries = TournamentLeaderboard(self).get_entries(limit=3)
+            if 1 <= target_rank <= len(overall_entries):
+                selected_players = [overall_entries[target_rank - 1].player]
+            else:
+                selected_players = []
+
+            for player in selected_players:
+                xuid = self._resolve_player_xuid(player)
+                if xuid:
+                    package_entries.append({
+                        'player': player,
+                        'xuid': xuid,
+                        'rank': target_rank,
+                    })
+                else:
+                    unresolved_players.append(player)
+
+        return {
+            'reward_type': normalized_reward_type,
+            'reward_scope': reward_scope,
+            'target_rank': target_rank,
+            'entries': package_entries,
+            'unresolved_players': unresolved_players,
+            'ids': tuple(entry['xuid'] for entry in package_entries if entry.get('xuid')),
+        }
+
+    def get_reward_packages(self, type=None) -> list[dict[str, object]]:
+        """Return all supported reward packages in display order."""
+        if type == 'round': package_order = [
+                (RewardPackageTypes.ROUND_FIRSTS.value, 'Round 1sts'),
+                (RewardPackageTypes.ROUND_SECONDS.value, 'Round 2nds'),
+                (RewardPackageTypes.ROUND_THIRDS.value, 'Round 3rds'),
+            ]
+        elif type == 'global': package_order = [
+            (RewardPackageTypes.GLOBAL_FIRST.value, 'Global 1st'),
+            (RewardPackageTypes.GLOBAL_SECOND.value, 'Global 2nd'),
+            (RewardPackageTypes.GLOBAL_THIRD.value, 'Global 3rd'),
+        ]
+        else: package_order = [
+            (RewardPackageTypes.ROUND_FIRSTS.value, 'Round 1sts'),
+            (RewardPackageTypes.ROUND_SECONDS.value, 'Round 2nds'),
+            (RewardPackageTypes.ROUND_THIRDS.value, 'Round 3rds'),
+            (RewardPackageTypes.GLOBAL_FIRST.value, 'Global 1st'),
+            (RewardPackageTypes.GLOBAL_SECOND.value, 'Global 2nd'),
+            (RewardPackageTypes.GLOBAL_THIRD.value, 'Global 3rd'),
+        ]
+
+        packages: list[dict[str, object]] = []
+        for reward_type, reward_label in package_order:
+            package = self.get_reward_package(reward_type)
+            raw_ids = package.get('ids')
+            raw_unresolved_players = package.get('unresolved_players')
+            ids = list(raw_ids) if isinstance(raw_ids, list | tuple) else []
+            unresolved_players = list(raw_unresolved_players) if isinstance(raw_unresolved_players, list | tuple) else []
+            reward_scope = str(package.get('reward_scope') or '')
+            if reward_scope == 'global':
+                display_text = ', '.join(ids)
+            elif ids:
+                display_text = f"{len(ids)} recipient{'s' if len(ids) != 1 else ''}"
+            else:
+                display_text = 'No recipients'
+
+            packages.append({
+                'reward_type': reward_type,
+                'reward_label': reward_label,
+                'ids': ids,
+                'copy_text': str(tuple(ids)),
+                'display_text': display_text,
+                'reward_scope': reward_scope,
+                'unresolved_players': unresolved_players,
+            })
+
+        return packages
+
     def get_leaderboard(self, round_num: int | None = None) -> RoundLeaderboard | TournamentLeaderboard:
         """Get leaderboard for a specific round or the overall tournament."""
         if round_num is not None:
@@ -468,6 +673,7 @@ class Tournament(db.Model):
                     data,
                     disq_players,
                 )
+                self._update_reward_package_cache(round_num, rounds_data[round_key])
                 # Reassign the archives mapping to ensure SQLAlchemy detects the in-place
                 # mutation of the JSON column and persists it on commit.
                 try:
