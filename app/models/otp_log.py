@@ -11,19 +11,16 @@ class OtpLog(db.Model):
     xuid = db.Column(db.String(80), nullable=False)
     hashed_otp_code = db.Column(db.String(128), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    ip_address = db.Column(db.String(45), nullable=True)
 
     @staticmethod
-    def log_attempt(xuid: str, otp_code: str, ip_address: str) -> None:
-
+    def log_attempt(xuid: str, otp_code: str) -> None:
         hashed_code = hashpw(otp_code.encode(), gensalt()).decode('utf-8')
-
-        otp_log = OtpLog(xuid=xuid, hashed_otp_code=hashed_code, ip_address=ip_address) # type: ignore
+        otp_log = OtpLog(xuid=xuid, hashed_otp_code=hashed_code) # type: ignore
         db.session.add(otp_log)
         db.session.commit()
 
     @staticmethod
-    def verify_otp(xuid: str, otp_code: str, ip_address: str) -> bool:
+    def verify_otp(xuid: str, otp_code: str) -> bool:
         """Verify the provided OTP code for the given XUID. Raises OtpLogError with specific messages for different failure cases."""
         recent_logs = (
             OtpLog.query
@@ -47,13 +44,10 @@ class OtpLog(db.Model):
         if not valid_log:
             raise OtpLogExpired("OTP code has expired.")
 
-        if valid_log.ip_address != ip_address:
-            raise OtpLogInvalidIp("IP address does not match.")
-
         return hashpw(otp_code.encode(), valid_log.hashed_otp_code.encode()) == valid_log.hashed_otp_code.encode()
 
     def __repr__(self):
-        return f"<OtpLog xuid={self.xuid} timestamp={self.timestamp} ip_address={self.ip_address}>"
+        return f"<OtpLog xuid={self.xuid} timestamp={self.timestamp}>"
 
 class OtpLogError(Exception):
     """Base exception for OTP log errors."""
@@ -66,21 +60,3 @@ class OtpLogNotFound(OtpLogError):
 class OtpLogExpired(OtpLogError):
     """Raised when an OTP code has expired."""
     pass
-
-class OtpLogInvalidIp(OtpLogError):
-    """Raised when the IP address does not match the OTP log."""
-    pass
-
-class BlockedIp(db.Model):
-    """Model to log blocked IP addresses due to suspicious activity."""
-    __tablename__ = 'blocked_ips'
-
-    id = db.Column(db.Integer, primary_key=True)
-    ip_address = db.Column(db.String(45), unique=True, nullable=False)
-    blocked_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    reason = db.Column(db.String(255), nullable=True)
-
-    REASON_TOO_MANY_ATTEMPTS = "User attempted verification of too many accounts from this IP."
-
-    def __repr__(self):
-        return f"<BlockedIp ip_address={self.ip_address} blocked_at={self.blocked_at} reason={self.reason}>"

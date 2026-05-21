@@ -1,6 +1,6 @@
 from flask import current_app, session
 from app.models.user import User
-from app.models.otp_log import OtpLog, BlockedIp
+from app.models.otp_log import OtpLog
 
 class VerificationError(Exception):
     """Custom exception for verification-related errors."""
@@ -16,15 +16,8 @@ class SuspiciousActivity(VerificationError):
     """Raised when suspicious activity is detected during verification."""
     pass
 
-def verify_request(xuid: str, request_ip: str) -> None:
-    """ Prevent spam and abuse by checking recent OTP logs for the user and IP address.
-        Raises VerificationError if too many attempts or suspicious activity is detected.
-    """
-
-    if (block_ip := BlockedIp.query.filter_by(ip_address=request_ip).first()):
-        raise SuspiciousActivity(block_ip.reason or "This IP address has been blocked due to suspicious activity.")
-
-    # Recent logs for this user
+def verify_request(xuid: str) -> None:
+    """Prevent spam and abuse by checking recent OTP logs for the user."""
 
     from datetime import datetime, timedelta, UTC
 
@@ -40,32 +33,12 @@ def verify_request(xuid: str, request_ip: str) -> None:
     if recent_logs and len(recent_logs) >= 5:
         raise TooManyAttempts()
 
-    # Recent logs for this IP (to detect mass account creation)
-    recent_ip_logs = (
-        OtpLog.query
-        .filter_by(ip_address=request_ip)
-        .filter(OtpLog.timestamp >= datetime.now(UTC) - timedelta(weeks=28))
-        .all()
-    )
-
-    distinct_xuids = set(log.xuid for log in recent_ip_logs)
-    # If this IP has attempted to set up more than 3 different accounts, block
-    if len(distinct_xuids) >= 3:
-        blocked_ip = BlockedIp(ip_address=request_ip, reason=BlockedIp.REASON_TOO_MANY_ATTEMPTS) # type: ignore
-        from app import db
-        db.session.add(blocked_ip)
-        db.session.commit()
-        raise SuspiciousActivity("Suspicious activity detected from this IP address.")
-
-def send_verification_pin(user: User, discord_id: int, request_ip: str) -> None:
+def send_verification_pin(user: User, discord_id: int) -> None:
     """Send the verification PIN to the user's linked Discord account via webhook."""
 
-    # Raises VerificationError if there are too many attempts or suspicious activity detected
+    # Raises VerificationError if there are too many attempts.
     # Handled by the caller to provide appropriate feedback to the user
-    if request_ip:
-        verify_request(user.xuid, request_ip)
-    else:
-        current_app.logger.warning(f"Verification attempt for user {user.username} without IP address.")
+    verify_request(user.xuid)
 
     session['pending_registration'] = {
         'xuid': user.xuid,
@@ -76,7 +49,7 @@ def send_verification_pin(user: User, discord_id: int, request_ip: str) -> None:
 
     import secrets
     pin = f"{secrets.randbelow(1_000_000):06d}"
-    if request_ip: OtpLog.log_attempt(user.xuid, pin, request_ip)
+    OtpLog.log_attempt(user.xuid, pin)
 
     msg = f"<@{discord_id}>, please use the following PIN to verify your account: `{pin}`"
     from app.utils.discord_webhook_utils import send, ChannelWebhookUrl

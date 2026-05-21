@@ -4,7 +4,6 @@ from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 load_dotenv()
 
@@ -44,16 +43,6 @@ def create_app():
     """Factory function to create and configure the Flask application instance."""
     app = Flask(__name__, template_folder='templates', static_folder='static')
     app.config.from_object(Config)
-
-    if app.config.get('FLASK_ENV') == 'production':
-        # ProxyFix configuration to ensure IP address detection works correctly
-        app.wsgi_app = ProxyFix(
-            app.wsgi_app, 
-            x_for=1,   # Trusts the X-Forwarded-For header
-            x_proto=1, # Trusts the X-Forwarded-Proto header (http vs https)
-            x_host=1,  # Trusts the X-Forwarded-Host header
-            x_prefix=1 # Trusts the X-Forwarded-Prefix header
-        )
 
     db.init_app(app)
     global migrate

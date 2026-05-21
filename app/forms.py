@@ -74,11 +74,6 @@ class WhitelistAddForm(FlaskForm):
     username = StringField('Minecraft Username', validators=[DataRequired(), Length(min=3, max=80)])
     submit = SubmitField('Add to Whitelist')
 
-class BlockedIpAddForm(FlaskForm):
-    """Form for adding a blocked IP address."""
-    ip_address = StringField('IP Address', validators=[DataRequired(), Length(min=7, max=45)])
-    submit = SubmitField('Block IP')
-
 class EmptyForm(FlaskForm):
     """CSRF-only form for POST actions that do not require fields."""
     submit = SubmitField('Submit')

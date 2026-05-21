@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, jsonify, render_template, redirect, url_for, session, request
+from flask import Blueprint, current_app, jsonify, render_template, redirect, url_for, session
 from app import db
 from app.models.tournament import Tournament
 from app.models.user import InvalidPassword, User, UserRole, UserNotFound, UserAlreadyExists
@@ -105,7 +105,7 @@ def handle_registration_pin():
     from app.auth.utils.verification_utils import send_verification_pin, TooManyAttempts, SuspiciousActivity
     from app.utils.discord_webhook_utils import WebhookError
     try:
-        send_verification_pin(user, discord_id=discord_id, request_ip=request.remote_addr) # type: ignore
+        send_verification_pin(user, discord_id=discord_id)
     except WebhookError as exc:
         current_app.logger.error(f"Webhook error during PIN sending: {exc}")
         flash('An error occurred while sending the verification PIN. Please contact an administrator.', 'error')
@@ -141,16 +141,14 @@ def verify_registration_pin():
         flash_all_form_errors(verify_form)
         return jsonify({"status": "error"}), code
 
-    from app.models.otp_log import OtpLog, OtpLogNotFound, OtpLogExpired, OtpLogInvalidIp
+    from app.models.otp_log import OtpLog, OtpLogNotFound, OtpLogExpired
     try:
-        otp_verify = OtpLog.verify_otp(pending.get('xuid'), verify_form.pin.data, request.remote_addr) # type: ignore
+        pin = verify_form.pin.data or ''
+        otp_verify = OtpLog.verify_otp(pending.get('xuid'), pin)
     except OtpLogNotFound as exc:
         verify_form.pin.errors = [*verify_form.pin.errors, str(exc)]
         return fail()
     except OtpLogExpired as exc:
-        verify_form.pin.errors = [*verify_form.pin.errors, str(exc)]
-        return fail()
-    except OtpLogInvalidIp as exc:
         verify_form.pin.errors = [*verify_form.pin.errors, str(exc)]
         return fail()
     except Exception as exc:
@@ -205,10 +203,15 @@ def logout():
 def delete_account():
     from flask_login import current_user, logout_user
     if current_user.is_authenticated:
-        current_user.delete()
-        db.session.commit()
-        logout_user()
-        flash('Your account has been deleted.', 'success')
+        try:
+            current_user.delete()
+            db.session.commit()
+            logout_user()
+            flash('Your account has been deleted.', 'success')
+        except Exception as exc:
+            db.session.rollback()
+            current_app.logger.error(f"Unexpected account delete error: {exc}")
+            flash('An unexpected error occurred while deleting your account.', 'error')
     else:
         flash('You need to be logged in to delete your account.', 'error')
     return redirect(url_for('auth.login'))
