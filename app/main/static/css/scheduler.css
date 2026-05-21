@@ -1,0 +1,249 @@
+#scheduler-page .scheduler-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+#scheduler-page .section-title {
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-on-background);
+    letter-spacing: 0.5px;
+}
+
+#scheduler-page .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+
+    background: var(--background-card);
+    border: 1px solid var(--primary);
+    border-radius: 10px;
+
+    margin-top: 2rem;
+}
+
+#scheduler-page .empty-state h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-on-background);
+}
+
+#scheduler-page .empty-state p {
+    color: var(--text-on-background-secondary);
+    font-size: 1rem;
+}
+
+#scheduler-page .tournament-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+#scheduler-page .tournament-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    background: var(--background-card);
+    border: 1px solid var(--primary);
+    border-left-width: 6px;
+    border-radius: 8px;
+
+    padding: 1rem 1.25rem;
+    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+#scheduler-page .tournament-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    transform: translateY(-1px);
+    cursor: pointer;
+}
+
+#scheduler-page .status-past {
+    border-left-color: #777;
+}
+
+#scheduler-page .status-current {
+    border-left-color: #2ecc71;
+}
+
+#scheduler-page .status-future {
+    border-left-color: #3498db;
+}
+
+#scheduler-page .tournament-row-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+#scheduler-page .tournament-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-on-background);
+}
+
+#scheduler-page .tournament-dates {
+    font-size: 0.9rem;
+    color: var(--text-on-background-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+#scheduler-page .separator {
+    opacity: 0.6;
+}
+
+#scheduler-page .tournament-row-right {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-on-background);
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    gap: 1.5rem;
+}
+
+#scheduler-page .create-tournament-btn {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+
+    background: var(--primary-gradient);
+    color: var(--text-on-primary-dark);
+
+    padding: 1rem 1.5rem;
+    border: none;
+    border-radius: 50px;
+
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 700;
+
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    z-index: 999;
+}
+
+#scheduler-page .create-tournament-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+#scheduler-page .field-label {
+    margin: 1rem 0 0;
+    font-weight: 600;
+    color: var(--text-on-background);
+}
+
+#scheduler-page .field-input,
+#scheduler-page .field-textarea {
+    max-width: 95%;
+    resize: vertical;
+    box-sizing: border-box;
+    padding: 0.6rem 0.75rem;
+
+    background: var(--background);
+    color: var(--text-on-background);
+
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+
+    font-size: 1rem;
+    line-height: 1.4;
+
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scheduler-page .field-textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+#scheduler-page .field-input:focus,
+#scheduler-page .field-textarea:focus {
+    outline: none;
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.25);
+}
+
+/* Date picker styling */
+#scheduler-page input[type="date"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6rem 0.75rem;
+
+    background: var(--background);
+    color: var(--text-on-background);
+
+    border: 1px solid var(--primary);
+    border-radius: 6px;
+
+    font-size: 1rem;
+    line-height: 1.4;
+
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#scheduler-page input[type="date"]:focus {
+    outline: none;
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 3px rgba(255, 140, 0, 0.25);
+}
+
+/* Style the date picker calendar icon */
+#scheduler-page input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(0.8);
+    cursor: pointer;
+}
+
+#scheduler-page .time-preview {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-on-background-secondary);
+    min-height: 1.2em;
+}
+
+#scheduler-page .field-errors {
+    margin-top: 0.35rem;
+    color: var(--danger);
+    font-size: 0.85rem;
+}
+
+#scheduler-page .modal-card {
+    max-width: 500px;
+    width: 90%;
+    max-height: 95vh;
+
+    background: var(--background);
+    border-radius: 10px;
+    padding: 1.5rem;
+
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+@media (max-width: 600px) {
+    #scheduler-page .tournament-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    #scheduler-page .tournament-row-right {
+        align-self: flex-end;
+    }
+
+    #scheduler-page .create-tournament-btn {
+        bottom: 1.2rem;
+        right: 1.2rem;
+        padding: 0.8rem 1.2rem;
+        font-size: 0.9rem;
+    }
+}

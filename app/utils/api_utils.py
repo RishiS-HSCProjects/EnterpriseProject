@@ -4,9 +4,14 @@ from __future__ import annotations
 from typing import Any, Optional
 from flask import current_app
 import requests
+import time
 
 BASE_URL = "https://api.ngmc.co/v1/"
-DEFAULT_TIMEOUT = 10 # seconds
+DEFAULT_TIMEOUT = 30 # seconds
+# Retry configuration for 'transient' errors
+MAX_RETRIES = 3
+# Cooldown that (pauses) 'backs off' from the request to give the program time to 'breathe' and verify the connection before retrying.
+BACKOFF_FACTOR = 1 # seconds (exponential factor with base 2: `sleep_for = BACKOFF_FACTOR * (2 ** (attempt - 1))`)
 
 # Exception classes for each error code
 class NetherGamesAPIError(Exception):
@@ -57,7 +62,14 @@ class MaintenanceMode(NetherGamesAPIError):
     """Code 50001: Maintenance Mode."""
     pass
 
-# Map error codes to exception classes
+HTTP_ERROR_MAP = {
+    404: UnknownPlayer,
+    400: NetherGamesAPIError,
+    401: MissingAccess,
+    403: MissingAccess,
+    500: MaintenanceMode,
+}
+
 ERROR_CODE_MAP = {
     0: GeneralError,
     10005: UnknownFaction,
@@ -73,6 +85,7 @@ ERROR_CODE_MAP = {
 }
 
 def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
+    """ Send a request to the NetherGames API """
     url = f"{BASE_URL.rstrip('/')}/{path.lstrip('/')}"
     API_KEY = current_app.config.get('NETHERGAMES_API_KEY')
     if not API_KEY:
@@ -82,26 +95,97 @@ def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
         'Authorization': API_KEY,
         'Content-Type': 'application/json'
     }
-    response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT, headers=headers)
 
-    try:
-        response.raise_for_status()
-    except requests.HTTPError as exc:
-        raise NetherGamesAPIError(
-            f"NetherGames API request failed: {response.status_code}"
-        ) from exc
+    current_app.logger.debug(
+        "NetherGames API request starting: path=%s params=%s timeout=%s max_retries=%s",
+        path,
+        params,
+        DEFAULT_TIMEOUT,
+        MAX_RETRIES,
+    )
 
-    try:
-        data = response.json()
+    for attempt in range(1, MAX_RETRIES + 1):
+        # Disclaimer: Reattempt logic given by AI.
+        # Reattempt X times
+        try:
+            current_app.logger.debug(
+                "NetherGames API attempt %s/%s for path=%s params=%s",
+                attempt,
+                MAX_RETRIES,
+                path,
+                params,
+            )
+            response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT, headers=headers)
+            current_app.logger.debug(
+                "NetherGames API response received: path=%s status_code=%s attempt=%s",
+                path,
+                response.status_code,
+                attempt,
+            )
+            break # Break on success
+        except requests.Timeout as exc:
+            current_app.logger.warning(
+                "NetherGames API attempt %s timed out: path=%s params=%s timeout=%s",
+                attempt,
+                path,
+                params,
+                DEFAULT_TIMEOUT,
+            )
+            if attempt < MAX_RETRIES:
+                sleep_for = BACKOFF_FACTOR * (2 ** (attempt - 1))
+                current_app.logger.debug(
+                    "Sleeping %s seconds before next attempt", sleep_for
+                )
+                time.sleep(sleep_for)
+                continue
+            raise NetherGamesAPIError(f"NetherGames API request timed out after {DEFAULT_TIMEOUT} seconds on attempt {attempt}.") from exc
+        except requests.RequestException as exc:
+            current_app.logger.error(
+                "NetherGames API request error on attempt %s: path=%s params=%s error=%s",
+                attempt,
+                path,
+                params,
+                exc,
+            )
+
+            if attempt < MAX_RETRIES:
+                sleep_for = BACKOFF_FACTOR * (2 ** (attempt - 1))
+                time.sleep(sleep_for)
+                continue
+
+            # If MAX retries exhausted, raise error
+            raise NetherGamesAPIError(f"NetherGames API request failed after {MAX_RETRIES} attempts: {exc}") from exc
+
+    if response.status_code in HTTP_ERROR_MAP:
+        # Status an error?
+        exc = HTTP_ERROR_MAP[response.status_code]
+        # Return detailed log
+        current_app.logger.error(
+            "NetherGames API HTTP error: path=%s status_code=%s params=%s",
+            path,
+            response.status_code,
+            params,
+        )
+        raise exc(f"HTTP {response.status_code}")
+
+    try: data = response.json() # Attempt to extract json from response
     except ValueError as exc:
         raise NetherGamesAPIError("NetherGames API returned invalid JSON.") from exc
 
-    # Check for error codes in response
-    if isinstance(data, dict) and 'code' in data:
-        error_code = data.get('code')
-        error_message = data.get('message', 'Unknown error')
+    if isinstance(data, dict) and "code" in data:
+        # "code" only returns in the case of an error (May 2026)
+        # Raise exception in this case
+        error_code = data["code"]
+        error_message = data.get("message", "Unknown error")
+        exc = ERROR_CODE_MAP.get(error_code, NetherGamesAPIError)
+        current_app.logger.error(
+            "NetherGames API returned application error: path=%s code=%s message=%s params=%s",
+            path,
+            error_code,
+            error_message,
+            params,
+        )
+        raise exc(error_message)
 
-        exception_class = ERROR_CODE_MAP.get(error_code, NetherGamesAPIError) # type: ignore
-        raise exception_class(error_message)
-
+    # Return dict of response
     return data

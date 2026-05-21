@@ -1,10 +1,10 @@
-{% extends "app-container.html" %}
+{% extends "base.html" %}
 
-{% block content %}
+{% block page_content %}
     <div id="form-container">
     {% block form %}{% endblock %}
     </div>
-{% endblock %}
+{% endblock page_content %}
 
 {% block scripts %}
     <script src="{{ url_for('auth.static', filename='js/registration.js') }}"></script>

@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% set title = "Scheduler" %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('main.static', filename='css/scheduler.css') }}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('main.static', filename='js/scheduler.js') }}"></script>
+{% endblock %}
+
+{% block page_content %}
+<div id="scheduler-page">
+<div class="scheduler-container">
+    {% if not previous_tournaments and not current_tournament and not future_tournaments %}
+        <div class="empty-state">
+            <h2>No tournaments scheduled</h2>
+            {% if current_user.is_authenticated %}
+            <p>Click "Create Tournament" to add a new tournament.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    {% if previous_tournaments %}
+        <h2 class="section-title">Previous Tournaments</h2>
+        {{ tournament_item(previous_tournaments, "past") }}
+    {% endif %}
+
+    {% if current_tournament %}
+        <h2 class="section-title">Current Tournament</h2>
+        {{ tournament_item([current_tournament], "current") }}
+    {% endif %}
+
+    {% if future_tournaments %}
+        <h2 class="section-title">Future Tournaments</h2>
+        {{ tournament_item(future_tournaments, "future") }}
+    {% endif %}
+
+</div>
+
+{% if current_user.is_authenticated %}
+<button class="create-tournament-btn">
+    Create Tournament
+</button>
+{% endif %}
+
+{% if add_form %}
+<div id="add-modal" class="modal" hidden data-show-add-modal="{{ 'true' if show_add_modal else 'false' }}">
+    <div class="modal-overlay"></div>
+
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-tournament-modal-title">
+        <h3 id="add-tournament-modal-title">Create Tournament</h3>
+        <p class="subtitle">Enter the details below to create a new tournament.</p>
+
+        <form id="add-tournament-form" method="POST">
+            {{ add_form.hidden_tag() }}
+
+            <!-- Tournament Name -->
+            <div class="form-group">
+                {{ add_form.name.label(class="field-label") }}
+                {{ add_form.name(class="field-input", placeholder="[MONTH] [GAMEMODE] Kills Tournament") }}
+                {% if add_form.name.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.name.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Start Date Picker (UTC Midnight) -->
+            <div class="form-group">
+                <label class="field-label">Start Date (UTC Midnight)</label>
+                <input type="date" id="start-date-picker" class="field-input" />
+                <div class="time-preview" id="start-preview"></div>
+                {{ add_form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
+                {% if add_form.start_unix.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.start_unix.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- End Date Picker (UTC Midnight) -->
+            <div class="form-group">
+                <label class="field-label">End Date (UTC Midnight)</label>
+                <input type="date" id="end-date-picker" class="field-input" />
+                <div class="time-preview" id="end-preview"></div>
+                {{ add_form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
+                {% if add_form.end_unix.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.end_unix.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Round Count -->
+            <div class="form-group">
+                {{ add_form.round_count.label(class="field-label") }}
+                {{ add_form.round_count(class="field-input", id="round-count-input") }}
+                <div class="time-preview" id="round-duration-preview"></div>
+                {% if add_form.round_count.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_count.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Discord Message -->
+            <div class="form-group">
+                {{ add_form.discord_message.label(class="field-label") }}
+                {{ add_form.discord_message(class="field-textarea") }}
+                {% if add_form.discord_message.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.discord_message.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Prizes -->
+            <div class="form-group">
+                {{ add_form.round_first_prize.label(class="field-label") }}
+                {{ add_form.round_first_prize(class="field-input") }}
+                {% if add_form.round_first_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_first_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.round_second_prize.label(class="field-label") }}
+                {{ add_form.round_second_prize(class="field-input") }}
+                {% if add_form.round_second_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_second_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.round_third_prize.label(class="field-label") }}
+                {{ add_form.round_third_prize(class="field-input") }}
+                {% if add_form.round_third_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.round_third_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_first_prize.label(class="field-label") }}
+                {{ add_form.global_first_prize(class="field-input") }}
+                {% if add_form.global_first_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_first_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_second_prize.label(class="field-label") }}
+                {{ add_form.global_second_prize(class="field-input") }}
+                {% if add_form.global_second_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_second_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                {{ add_form.global_third_prize.label(class="field-label") }}
+                {{ add_form.global_third_prize(class="field-input") }}
+                {% if add_form.global_third_prize.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.global_third_prize.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="auth-actions">
+                {{ add_form.submit(class="auth-button auth-button-primary") }}
+                <button type="button" id="close" class="auth-button auth-button-secondary" data-close-modal>
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}
+
+{% macro tournament_item(tournaments, status) %}
+<div class="tournament-list">
+    {% for t in tournaments %}
+    <div class="tournament-row status-{{ status }}" onclick="window.location='{{ url_for('main.tournament_editor', tournament_id=t.id) }}'">
+        <a class="tournament-row-left" href="{{ url_for('main.tournament_editor', tournament_id=t.id) }}">
+            <div class="tournament-name">{{ t.name }}</div>
+
+            <div class="tournament-dates">
+                <span class="dt" data-unix="{{ t.start_unix }}">{{ t.start_datetime.strftime('%d %B %H:%M') }}</span>
+                <span class="separator">→</span>
+                <span class="dt" data-unix="{{ t.end_unix }}">{{ t.end_datetime.strftime('%d %B %H:%M') }}</span>
+            </div>
+        </a>
+
+        <div class="tournament-row-right">
+            <div>{{ t.round_count }} rounds</div>
+            <div title="{% if t.tournament_info_discord_status %}Tournament info posted in Discord{% else %}Tournament info not posted in Discord{% endif %}">
+                {% if t.tournament_info_discord_status %}✅{% else %}❌{% endif %}
+            </div>
+            {% if t.is_expired %}
+            <div title="{% if t.awards_distributed %}Awards have been distributed{% else %}Awards have not been distributed{% endif %}">
+                {% if t.awards_distributed %}✅{% else %}❌{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}

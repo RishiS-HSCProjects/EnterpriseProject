@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const messages = Array.from(
         document.querySelectorAll('#flash-container .flash-message')
     );
-    
+
     messages.forEach((msg, index) => initFlashMessage(msg, index));
 });
 
@@ -25,35 +25,35 @@ function initFlashMessage(msg, index = 0) {
     // Stagger display
     setTimeout(() => {
         msg.classList.add('show');
-        
+
         // Force reflow so transitions don't skip
         void msg.offsetWidth;
-        
+
         // Initialize internal state
         msg.remaining = FLASH_DURATION;
         msg.lastTick = Date.now();
         msg.fadeOutStarted = false;
         msg.timer = requestAnimationFrame(() => tick(msg));
-        
+
         // Hover to pause timer
         msg.addEventListener('mouseenter', () => {
             if (msg.fadeOutStarted) return;
             pauseTimer(msg);
         });
-        
+
         // Hover to resume timer (with bonus time)
         msg.addEventListener('mouseleave', () => {
             if (msg.fadeOutStarted) return;
             msg.remaining = Math.min(msg.remaining + 2000, FLASH_DURATION);
             resumeTimer(msg);
         });
-        
+
         // Click to dismiss immediately
         msg.addEventListener('click', () => {
             pauseTimer(msg);
             fadeOut(msg);
         });
-        
+
     }, index * FLASH_STAGGER);
 }
 
@@ -67,14 +67,14 @@ function tick(msg) {
     const now = Date.now();
     const elapsed = now - msg.lastTick;
     msg.lastTick = now;
-    
+
     msg.remaining -= elapsed;
-    
+
     if (msg.remaining <= 0) {
         fadeOut(msg);
         return;
     }
-    
+
     msg.timer = requestAnimationFrame(() => tick(msg));
 }
 
@@ -109,13 +109,13 @@ function resumeTimer(msg) {
  */
 function fadeOut(msg) {
     if (msg.fadeOutStarted) return;
-    
+
     msg.fadeOutStarted = true;
     msg.classList.add('fade-out');
     msg.style.transition = 'opacity 0.45s ease, transform 0.45s ease';
     msg.style.opacity = '0';
     msg.style.transform = 'scale(0.95)';
-    
+
     setTimeout(() => {
         msg.remove();
     }, 450);
@@ -134,21 +134,21 @@ function sendFlashMessage(message, category = 'info') {
         console.error('Flash container not found in DOM.');
         return;
     }
-    
+
     // Validate category
     const validCategories = ['success', 'error', 'warning', 'info'];
     if (!validCategories.includes(category)) {
         category = 'info';
     }
-    
+
     // Create message element
     const msg = document.createElement('div');
     msg.className = `flash-message ${category}`;
     msg.textContent = message;
-    
+
     // Add to container
     container.appendChild(msg);
-    
+
     // Initialize with staggered timing
     const messageCount = container.querySelectorAll('.flash-message:not(.fade-out)').length;
     initFlashMessage(msg, messageCount - 1);

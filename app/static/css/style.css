@@ -2,9 +2,17 @@
     --primary: #FF8C00;
     --primary-dark: #E67E00;
     --primary-gradient: linear-gradient(135deg, #FF8C00 0%, #E67E00 100%);
+    --text-on-primary: #1A0E00;
+    --text-on-primary-dark: #ffffff;
+
+    --background: #1a1a1a;
+    --background-card: rgba(26, 26, 26, 0.6);
+    --text-on-background: #fff;
+    --text-on-background-secondary: #eeee;
 }
 
 body {
+    opacity: 0;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -12,18 +20,22 @@ body {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-color: #1a1a1a;
-    color: #ffffff;
+    background-color: var(--background);
+    color: var(--text-on-background);
     font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+body.loaded {
+    opacity: 1;
 }
 
 body::before {
     content: '';
     position: fixed;
     inset: 0;
-    background: radial-gradient(ellipse at 10% 10%, rgba(138,43,226,0.06), transparent 10%), radial-gradient(ellipse at 90% 80%, rgba(255,45,149,0.03), transparent 8%), rgba(10,10,16,0.5);
     pointer-events: none;
     z-index: -1;
 }
@@ -40,7 +52,7 @@ main {
 footer {
     width: min(1100px, calc(100% - 2rem));
     margin: 0 auto;
-    padding: 1rem 0 1.25rem;
+    padding: 0.9rem 0 0.25rem;
     border-top: 1px solid rgba(138,43,226,0.12);
 }
 
@@ -48,7 +60,7 @@ footer p {
     margin: 0;
     font-size: 0.85rem;
     text-align: center;
-    color: #cccccc;
+    color: var(--text-on-background-secondary);
 }
 
 h1,
@@ -70,6 +82,52 @@ a:hover {
     text-decoration: underline;
 }
 
-.page-content {
+#page-content {
     width: 100%;
+}
+
+#loader-container[hidden] {
+    display: none;
+}
+
+#loader-container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.55);
+    z-index: 9999;
+    pointer-events: all; /* prevent interaction with the page underneath */
+}
+
+/* centered square panel that uses theme background */
+#loader-container #loader {
+    width: min(300px, 30vmin);
+    height: min(300px, 30vmin);
+    background-color: var(--background);
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    position: relative;
+    padding: 1rem;
+}
+
+/* spinner ring rendered via pseudo-element so the panel stays square */
+#loader-container #loader::before {
+    content: '';
+    width: 120px;
+    height: 120px;
+    border: 12px solid rgba(255, 140, 0, 0.18);
+    border-top: 12px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1.6s linear infinite;
+    box-sizing: border-box;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

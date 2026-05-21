@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% set title = "Admin" %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('admin.static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block page_content %}
+<section class="admin-section">
+    <h2>Whitelist Management</h2>
+    <p class="admin-help">Add approved staff accounts so they can register and log in.</p>
+
+    <form method="POST" action="{{ url_for('admin.whitelist_add') }}" id="whitelist-add-form" class="admin-form">
+        {{ add_form.hidden_tag() }}
+        <div class="admin-form-row">
+            {{ add_form.username.label }}
+            {{ add_form.username(placeholder="Enter Minecraft username") }}
+        </div>
+        <div class="admin-actions">
+            {{ add_form.submit(class_="button") }}
+        </div>
+    </form>
+
+    <h2>Current Whitelist</h2>
+    <div class="admin-controls">
+        <input id="whitelist-search" class="field-input" placeholder="Search username or XUID" />
+        <select id="whitelist-filter" class="field-input">
+            <option value="all">All</option>
+            <option value="registered">Registered</option>
+            <option value="unregistered">Unregistered</option>
+        </select>
+        <div class="admin-aggregates">
+            <span id="agg-total">Total: 0</span>
+            <span id="agg-unregistered">Unregistered: 0</span>
+        </div>
+    </div>
+    {% if whitelist_entries %}
+        <div class="admin-table-wrapper" id="table-whitelist">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>XUID</th>
+                        <th>Registered</th>
+                        <th>Last Login</th>
+                        <th>Whitelisted At</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in whitelist_entries %}
+                        {% set user = entry.get_user() %}
+                        <tr>
+                            <td>{{ entry.username }}</td>
+                            <td>{{ entry.xuid }}</td>
+                            <td>{{ 'Yes' if user else 'No' }}</td>
+                            <td {% if user and user.last_login_at %}title="Time provided in UTC"{% endif %}>
+                                {{ (user.last_login_at.strftime('%Y-%m-%d %H:%M')) if user and user.last_login_at else 'NEVER' }}
+                            </td>
+                            <td {% if entry.whitelisted_at %}title="Time provided in UTC"{% endif %}>
+                                {{ entry.whitelisted_at.strftime('%Y-%m-%d %H:%M') if entry.whitelisted_at else 'N/A' }}
+                            </td>
+                            <td>
+                                {% if user and user.is_admin() %}
+                                {% else %}
+                                <form method="POST" action="{{ url_for('admin.whitelist_remove', entry_id=entry.id) }}" onsubmit="return confirm('Remove this whitelist entry?');" class="admin-remove-form">
+                                    {{ remove_form.hidden_tag() }}
+                                    <button type="submit" class="button-icon" title="Remove from whitelist">×</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="admin-empty">No whitelisted users yet.</p>
+    {% endif %}
+</section>
+
+<section class="admin-section">
+    <h2>Blocked IPs</h2>
+    <p class="admin-help">Block IP addresses from suspicious activity.</p>
+
+    <form method="POST" action="{{ url_for('admin.blocked_ip_add') }}" id="blocked-ip-add-form" class="admin-form">
+        {{ blocked_ip_form.hidden_tag() }}
+        <div class="admin-form-row">
+            {{ blocked_ip_form.ip_address.label }}
+            {{ blocked_ip_form.ip_address(placeholder="Enter IP address") }}
+        </div>
+        <div class="admin-actions">
+            {{ blocked_ip_form.submit(class_="button") }}
+        </div>
+    </form>
+
+    <h2>Current Blocked IPs</h2>
+    <div class="admin-controls">
+        <input id="blocked-search" class="field-input" placeholder="Search IP address or reason" />
+        <select id="blocked-filter" class="field-input">
+            <option value="all">All</option>
+            <option value="recent">Recent (24h)</option>
+            <option value="with-reason">Justified</option>
+            <option value="without-reason">Unjustified</option>
+        </select>
+        <div class="admin-aggregates">
+            <span id="agg-block-total">Total: 0</span>
+        </div>
+    </div>
+    {% if blocked_ips %}
+        <div class="admin-table-wrapper" id="table-blocked_ips">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Blocked At</th>
+                        <th>Reason</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ip_entry in blocked_ips %}
+                        <tr>
+                            <td>{{ ip_entry.ip_address }}</td>
+                            <td>{{ ip_entry.blocked_at.strftime('%Y-%m-%d %H:%M') if ip_entry.blocked_at else 'N/A' }}</td>
+                            <td>{{ ip_entry.reason or '—' }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('admin.blocked_ip_remove', ip_id=ip_entry.id) }}" onsubmit="return confirm('Unblock this IP?');" class="admin-remove-form">
+                                    {{ remove_form.hidden_tag() }}
+                                    <button type="submit" class="button-icon" title="Remove from blocked list">×</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="admin-empty">No blocked IPs.</p>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('admin.static', filename='js/admin.js') }}"></script>
+{% endblock %}
