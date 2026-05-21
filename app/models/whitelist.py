@@ -10,7 +10,8 @@ class Whitelist(db.Model):
     xuid = db.Column(db.String(50), unique=True, nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     whitelisted_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    whitelisted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    whitelisted_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    whitelisted_by_xuid = db.Column(db.String(50), nullable=True)
 
     def unwhitelist(self):
         """Remove this user from the whitelist. Also deletes the associated User account if it exists."""
@@ -55,6 +56,7 @@ class Whitelist(db.Model):
         whitelist_entry.xuid = xuid
         whitelist_entry.username = username
         whitelist_entry.whitelisted_by = current_user.id
+        whitelist_entry.whitelisted_by_xuid = current_user.xuid
         return whitelist_entry
 
 class WhitelistError(Exception):

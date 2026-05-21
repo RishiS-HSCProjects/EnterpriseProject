@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const ip = (ipInput.value || '').trim();
 
             // Check only inside blocked IPs table
-            const blockedIpTable = document.querySelector('#table-blocked-ips table tbody');
+            const blockedIpTable = document.querySelector('#table-blocked_ips table tbody');
             if (blockedIpTable) {
                 const rows = blockedIpTable.querySelectorAll('tr');
                 for (const row of rows) {
@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function updateBlockedAggregates() {
-    const blockedTable = document.querySelector('#table-blocked-ips table tbody');
+    const blockedTable = document.querySelector('#table-blocked_ips table tbody');
     if (!blockedTable) return;
 
     const rows = Array.from(blockedTable.querySelectorAll('tr'));
@@ -153,7 +153,7 @@ function applyBlockedFilters() {
     const query = (document.getElementById('blocked-search')?.value || '').trim().toLowerCase();
     const filter = (document.getElementById('blocked-filter')?.value || 'all');
 
-    const blockedTable = document.querySelector('#table-blocked-ips table tbody');
+    const blockedTable = document.querySelector('#table-blocked_ips table tbody');
     if (!blockedTable) return;
 
     const rows = blockedTable.querySelectorAll('tr');

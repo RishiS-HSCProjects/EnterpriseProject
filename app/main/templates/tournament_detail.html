@@ -286,7 +286,7 @@
             </div>
             {% endif %}
 
-            {% if current_user.is_authenticated and tournament.is_expired %}
+            {% if current_user.is_authenticated and current_user.is_manager() and tournament.is_expired %}
             <hr>
             <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
                 <h3 class="reward-packages-heading">Stats Packaging</h3>

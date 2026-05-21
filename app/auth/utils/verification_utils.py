@@ -25,9 +25,13 @@ def verify_request(xuid: str, request_ip: str) -> None:
         raise SuspiciousActivity(block_ip.reason or "This IP address has been blocked due to suspicious activity.")
 
     # Recent logs for this user
+
+    from datetime import datetime, timedelta, UTC
+
     recent_logs = (
         OtpLog.query
         .filter_by(xuid=xuid)
+        .filter(OtpLog.timestamp >= datetime.now(UTC) - timedelta(minutes=30))
         .order_by(OtpLog.timestamp.desc())
         .limit(10)
         .all()
@@ -40,6 +44,7 @@ def verify_request(xuid: str, request_ip: str) -> None:
     recent_ip_logs = (
         OtpLog.query
         .filter_by(ip_address=request_ip)
+        .filter(OtpLog.timestamp >= datetime.now(UTC) - timedelta(weeks=28))
         .all()
     )
 

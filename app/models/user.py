@@ -41,11 +41,17 @@ class User(UserMixin, db.Model):
     def delete(self):
         """Delete user from database."""
         tournaments = Tournament.query.filter_by(created_by=self.id).all()
+        whitelist_entries = Whitelist.query.filter_by(whitelisted_by=self.id).all()
         from copy import copy
         xuid = copy(self.xuid)
         db.session.delete(self)
+
         for tournament in tournaments:
             tournament.set_created_by(xuid=xuid, delete_user=True)
+
+        for wl in whitelist_entries:
+            wl.whitelisted_by = None
+            wl.whitelisted_by_xuid = xuid
 
     @property
     def role(self) -> UserRole:

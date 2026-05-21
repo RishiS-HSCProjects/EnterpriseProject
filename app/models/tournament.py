@@ -338,7 +338,8 @@ class Tournament(db.Model):
     tournament_info_discord_status = db.Column(db.Boolean, nullable=False, default=False)
     prizes = db.Column(MutableDict.as_mutable(db.JSON), default=dict)
     awards_distributed = db.Column(db.Boolean, nullable=False, default=False)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_by_xuid = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.Integer, nullable=False, default=lambda: int(datetime.now(UTC).timestamp()))
     updated_at = db.Column(db.Integer, nullable=False, default=lambda: int(datetime.now(UTC).timestamp()), onupdate=lambda: int(datetime.now(UTC).timestamp()))
     archives = db.Column(MutableDict.as_mutable(db.JSON), default=dict)
@@ -723,9 +724,11 @@ class Tournament(db.Model):
         if user:
             self.created_by = user.id
         elif kwargs.get('delete_user'):
-            self.created_by = xuid
+            self.created_by = None
         else:
             raise ValueError(f"No user found with XUID {xuid}")
+
+        self.created_by_xuid = xuid
 
     @classmethod
     def create(
@@ -749,6 +752,8 @@ class Tournament(db.Model):
         tournament.end_unix = int(end_unix)
         tournament.round_count = round_count
         tournament.created_by = created_by
+        from app.models.user import User
+        tournament.created_by_xuid = user.xuid if (user := User.query.get(created_by)) else None
         tournament.prizes = prizes.to_dict() if prizes else {}
         db.session.add(tournament)
         db.session.commit()

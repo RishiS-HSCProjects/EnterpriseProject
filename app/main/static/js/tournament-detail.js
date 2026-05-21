@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('Clipboard copy failed: ', error);
                 }
             });
-        });s
+        });
     }
 
     async function loadRewardPackages(type = null) { // type='round'; type='global';

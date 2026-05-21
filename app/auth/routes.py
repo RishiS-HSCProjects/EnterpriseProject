@@ -186,9 +186,8 @@ def verify_registration_pin():
     db.session.add(user)
     db.session.commit()
 
-    for tourn in Tournament.query.filter_by(created_by=user.xuid).all():
+    for tourn in Tournament.query.filter_by(created_by_xuid=user.xuid).all():
         tourn.set_created_by(xuid=user.xuid)
-
     db.session.commit()
 
     session.pop('pending_registration', None)
