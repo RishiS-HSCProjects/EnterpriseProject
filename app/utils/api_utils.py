@@ -108,20 +108,7 @@ def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
         # Disclaimer: Reattempt logic given by AI.
         # Reattempt X times
         try:
-            current_app.logger.debug(
-                "NetherGames API attempt %s/%s for path=%s params=%s",
-                attempt,
-                MAX_RETRIES,
-                path,
-                params,
-            )
             response = requests.get(url, params=params, timeout=DEFAULT_TIMEOUT, headers=headers)
-            current_app.logger.debug(
-                "NetherGames API response received: path=%s status_code=%s attempt=%s",
-                path,
-                response.status_code,
-                attempt,
-            )
             break # Break on success
         except requests.Timeout as exc:
             current_app.logger.warning(
@@ -133,9 +120,6 @@ def request(path: str, params: Optional[dict[str, Any]] = None) -> Any:
             )
             if attempt < MAX_RETRIES:
                 sleep_for = BACKOFF_FACTOR * (2 ** (attempt - 1))
-                current_app.logger.debug(
-                    "Sleeping %s seconds before next attempt", sleep_for
-                )
                 time.sleep(sleep_for)
                 continue
             raise NetherGamesAPIError(f"NetherGames API request timed out after {DEFAULT_TIMEOUT} seconds on attempt {attempt}.") from exc

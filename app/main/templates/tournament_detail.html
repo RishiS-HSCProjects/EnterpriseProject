@@ -142,7 +142,7 @@
                             title="{% if tournament.tournament_info_discord_status %}Locked because this announcement has already been sent.{% else %}Locked because the tournament has ended.{% endif %}"
                         >Announcement Locked</button>
                     {% else %}
-                        <button type="submit" class="auth-button auth-button-secondary">Send to Discord</button>
+                        <button type="submit" class="auth-button auth-button-secondary" onclick="return confirm('Are you sure you want to send the tournament info to Discord? This cannot be undone.');">Send to Discord</button>
                     {% endif %}
                 </form>
                 <form method="POST" action="{{ url_for('main.tournament_send_prizes_discord', tournament_id=tournament.id) }}" style="display: inline;">
@@ -161,7 +161,7 @@
                             title="Locked because the prizes announcement has already been sent."
                         >Prizes Announcement Locked</button>
                     {% else %}
-                        <button type="submit" class="auth-button auth-button-secondary">Send Prizes Announcement</button>
+                        <button type="submit" class="auth-button auth-button-secondary" onclick="return confirm('Are you sure you want to send the prizes announcement to Discord? This cannot be undone.');">Send Prizes Announcement</button>
                     {% endif %}
                 </form>
                 {% endif %}
@@ -204,7 +204,7 @@
                         <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required />
                         <div style="text-align:right;">
                             <button type="button" class="auth-button" data-close-modal>Cancel</button>
-                            <button type="submit" class="auth-button auth-button-danger">Delete</button>
+                            <button type="submit" class="auth-button auth-button-danger" onclick="return confirm('Are you sure you want to delete the tournament "{{ tournament.name }}"? This cannot be undone.');">Delete</button>
                         </div>
                     </form>
                 </div>

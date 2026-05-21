@@ -632,8 +632,6 @@ def tournament_cache_stats(tournament_id: int):
             return f'{plural_label} {rounds[0]} and {rounds[1]}'
         return f"{plural_label} {', '.join(map(str, rounds[:-1]))} and {rounds[-1]}"
 
-    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-
     before_rounds = _round_keys()
     current_app.logger.debug(
         "Cache stats before archive attempt for tournament id=%s: round_keys=%s",
@@ -670,9 +668,8 @@ def tournament_cache_stats(tournament_id: int):
                 cached_rounds,
                 failed_rounds,
             )
-            if is_ajax:
-                return jsonify({'success': True, 'message': message, 'cached_rounds': cached_rounds, 'failed_rounds': failed_rounds})
-            flash(message, 'success')
+
+            return jsonify({'success': True, 'message': message, 'cached_rounds': cached_rounds, 'failed_rounds': failed_rounds})
         elif failed_rounds:
             message = f"Failed to cache {_format_rounds(failed_rounds)}"
             current_app.logger.error(
@@ -682,9 +679,7 @@ def tournament_cache_stats(tournament_id: int):
                 sorted(before_rounds),
                 sorted(after_rounds),
             )
-            if is_ajax:
-                return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': failed_rounds}), 500
-            flash(message, 'error')
+            return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': failed_rounds}), 500
         else:
             message = 'No finished rounds available to cache.'
             current_app.logger.error(
@@ -697,9 +692,6 @@ def tournament_cache_stats(tournament_id: int):
                 tourney.is_active,
                 tourney.is_expired,
             )
-            if is_ajax:
-                return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
-            flash(message, 'error')
     except TournamentArchiveException as exc:
         current_app.logger.error(
             "TournamentArchiveException while caching tournament id=%s: %s",
@@ -707,17 +699,13 @@ def tournament_cache_stats(tournament_id: int):
             exc,
         )
         message = f'Error archiving stats: {str(exc)}'
-        if is_ajax:
-            return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
-        flash(message, 'error')
+        return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
     except Exception:
         current_app.logger.exception('Error caching tournament stats')
         message = 'Unexpected error caching tournament stats'
-        if is_ajax:
-            return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 500
-        flash(message, 'error')
+        return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 500    
 
-    return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+    return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
 
 @main_bp.route('/scheduler/<int:tournament_id>/delete', methods=['POST'])
 @login_required

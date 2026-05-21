@@ -134,17 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const formData = new FormData(form);
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                    },
-                    body: new URLSearchParams(formData),
+                    body: formData,
                 });
 
                 let data = {};
                 try {
                     data = await response.json();
-                } catch (e) { /* Ignore */ }
+                } catch (e) { 
+                    console.error('Failed to parse JSON response:', e);
+                    sendFlashMessage('Server error during caching.', 'error');
+                    return;
+                }
 
                 sendFlashMessage(data.message || 'Caching completed.', data.success ? 'success' : 'error');
 
@@ -152,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => window.location.reload(), 500);
                 }
             } catch (error) {
+                console.error('Unexpected error caching tournament stats:', error);
                 sendFlashMessage('Unexpected error caching tournament stats.', 'error');
             } finally {
                 if (typeof endLoader === 'function') endLoader();
