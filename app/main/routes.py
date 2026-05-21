@@ -418,14 +418,13 @@ def tournament_editor(tournament_id: int):
     return render_template('tournament_detail.html', **kwargs)
 
 @main_bp.route('/scheduler/<int:tournament_id>/package/stats', methods=['GET', 'POST'])
-@login_required
 def tournament_package_stats(tournament_id: int):
     """ Package stats in a SQL tuple form. """
-    if not current_user.is_manager():
-        return jsonify({'success': False, 'message': 'Access denied. Managers only.'})
+    if not (current_user and current_user.is_manager()):
+        return jsonify({'success': False, 'message': 'Access denied. Managers only.'}), 403
 
     if not (tourney := Tournament.query.get_or_404(tournament_id)):
-        return jsonify({'success': False, 'message': f'Tournament {tournament_id} not found.'})
+        return jsonify({'success': False, 'message': f'Tournament {tournament_id} not found.'}), 404
 
     current_app.logger.info(request.method)
     packages = tourney.get_reward_packages(type=request.args.get('type', None))
@@ -603,8 +602,10 @@ def tournament_send_prizes_discord(tournament_id: int):
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 
 @main_bp.route('/scheduler/<int:tournament_id>/cache/stats', methods=['POST'])
-@login_required
 def tournament_cache_stats(tournament_id: int):
+    if not (current_user and current_user.is_manager()):
+        return jsonify({'success': False, 'message': 'Access denied. Managers only.'}), 403
+
     tourney = Tournament.query.get_or_404(tournament_id)
     current_app.logger.info(
         "Cache stats requested for tournament id=%s name=%s round_count=%s archived_rounds=%s",

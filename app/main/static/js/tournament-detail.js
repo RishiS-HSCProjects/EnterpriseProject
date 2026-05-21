@@ -97,11 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`${packageUrl}?type=${encodeURIComponent(type)}`, {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest', // For AJAX flag
-                }
-            });
+            const response = await fetch(`${packageUrl}?type=${encodeURIComponent(type)}`);
 
             const data = await response.json();
             if (data.success) {
