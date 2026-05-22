@@ -54,4 +54,4 @@ def send_verification_pin(user: User, discord_id: int) -> None:
     msg = f"<@{discord_id}>, please use the following PIN to verify your account: `{pin}`"
     from app.utils.discord_webhook_utils import send, ChannelWebhookUrl
     # Raises WebhookError if sending fails, which should be handled by the caller to provide feedback to the user
-    send(ChannelWebhookUrl.SECURE_WEBHOOK_URL, username="NetherGames PLX Registration", content=msg)
+    send(ChannelWebhookUrl.SECURE_WEBHOOK_URL, username="NetherGames Tournament Bot - Registration", content=msg)

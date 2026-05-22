@@ -103,6 +103,17 @@
         });
     </script>
 
+    <script>
+        // Warn users on small / touch devices that the UI is not suited for them
+        document.addEventListener('DOMContentLoaded', () => {
+            const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+            const smallScreen = window.innerWidth && window.innerWidth < 1024;
+            if (isTouch || smallScreen) {
+                alert('Note: This site is best viewed on a desktop. The UI may not be suited for small or touch devices.');
+            }
+        });
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

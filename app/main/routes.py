@@ -468,7 +468,7 @@ def tournament_send_discord(tournament_id: int):
     )
 
     if message:
-        message_content += f"\n### Additional Info\n{message}"
+        message_content += f"\n### Additional Info\n{message}\n"
 
     message_content += (
         "\nTo participate, simply play the tournament game as you normally would during the tournament period."

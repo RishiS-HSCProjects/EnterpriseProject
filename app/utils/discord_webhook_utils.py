@@ -24,7 +24,7 @@ class ChannelWebhookUrl(Enum):
 def send(
     location: ChannelWebhookUrl,
     content: str = "",
-    username: str = "Enterprise Project Bot",
+    username: str = "NetherGames Tournament Bot",
     header: str | None = None,
     timeout: int = 10,
     **kwargs
