@@ -1,99 +1,149 @@
 from functools import wraps
-from flask import Blueprint, current_app, redirect, render_template, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from app import db
 from app.forms import EmptyForm, WhitelistAddForm
-from app.models.user import UserNotFound
+from app.models.user import UserNotFound, UserRole
 from app.models.whitelist import PermissionDenied, UserAlreadyWhitelisted, Whitelist
 from app.utils.utils import flash, flash_all_form_errors
 
 admin_bp = Blueprint(
-	'admin',
-	__name__,
-	url_prefix='/admin',
-	template_folder='templates',
-	static_folder='static',
-	static_url_path='/admin/static',
+    'admin',
+    __name__,
+    url_prefix='/admin',
+    template_folder='templates',
+    static_folder='static',
+    static_url_path='/admin/static',
 )
 
 def admin_required(view): # Wrapper function
-	"""Require an authenticated admin before entering an admin route."""
-	@wraps(view)
-	@login_required
-	def wrapped(*args, **kwargs):
-		if not current_user.is_admin():
-			flash('Access denied: Admins only.', 'error')
-			return redirect(url_for('main.dashboard'))
+    """Require an authenticated admin before entering an admin route."""
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if not current_user.is_admin():
+            flash('Access denied: Admins only.', 'error')
+            return redirect(url_for('main.dashboard'))
 
-		return view(*args, **kwargs)
+        return view(*args, **kwargs)
 
-	return wrapped
+    return wrapped
 
 @admin_bp.route('/')
 @admin_required
 def panel():
-	whitelist_entries = Whitelist.query.order_by(Whitelist.whitelisted_at.desc()).all()
-	# Exclude current user's own entry from display
-	visible_entries = [entry for entry in whitelist_entries if entry.xuid != current_user.xuid]
+    whitelist_entries = Whitelist.query.order_by(Whitelist.whitelisted_at.desc()).all()
+    # Exclude current user's own entry from display
+    visible_entries = [entry for entry in whitelist_entries if entry.xuid != current_user.xuid]
 
-	return render_template(
-		'admin.html',
-		add_form=WhitelistAddForm(),
-		remove_form=EmptyForm(),
-		whitelist_entries=visible_entries,
-	)
+    return render_template(
+        'admin.html',
+        add_form=WhitelistAddForm(),
+        empty_form=EmptyForm(),
+        whitelist_entries=visible_entries,
+    )
 
 @admin_bp.route('/whitelist/add', methods=['POST'])
 @admin_required
 def whitelist_add():
-	form = WhitelistAddForm()
-	if not form.validate_on_submit():
-		flash_all_form_errors(form)
-		return redirect(url_for('admin.panel'))
+    form = WhitelistAddForm()
+    if not form.validate_on_submit():
+        flash_all_form_errors(form)
+        return redirect(url_for('admin.panel'))
 
-	username = (form.username.data or '').strip()
+    username = (form.username.data or '').strip()
 
-	try:
-		whitelist_entry = Whitelist.whitelist_user(username)
-		db.session.add(whitelist_entry)
-		db.session.commit()
-		flash(f'{username} was added to the whitelist.', 'success')
-	except (UserAlreadyWhitelisted, PermissionDenied, UserNotFound) as exc:
-		db.session.rollback()
-		flash(str(exc), 'error')
-	except Exception as exc:
-		db.session.rollback()
-		current_app.logger.error(f'Unexpected whitelist add error: {exc}')
-		flash('An unexpected error occurred while adding this user.', 'error')
+    try:
+        whitelist_entry = Whitelist.whitelist_user(username)
+        db.session.add(whitelist_entry)
+        db.session.commit()
+        flash(f'{username} was added to the whitelist.', 'success')
+    except (UserAlreadyWhitelisted, PermissionDenied, UserNotFound) as exc:
+        db.session.rollback()
+        flash(str(exc), 'error')
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error(f'Unexpected whitelist add error: {exc}')
+        flash('An unexpected error occurred while adding this user.', 'error')
 
-	return redirect(url_for('admin.panel'))
+    return redirect(url_for('admin.panel'))
 
 @admin_bp.route('/whitelist/remove/<int:entry_id>', methods=['POST'])
 @admin_required
 def whitelist_remove(entry_id: int):
-	form = EmptyForm()
-	if not form.validate_on_submit():
-		flash('Invalid request. Please refresh the page and try again.', 'error')
-		return redirect(url_for('admin.panel'))
+    form = EmptyForm()
+    if not form.validate_on_submit():
+        flash('Invalid request. Please refresh the page and try again.', 'error')
+        return redirect(url_for('admin.panel'))
 
-	whitelist_entry = Whitelist.query.get_or_404(entry_id)
-	username = whitelist_entry.username
+    whitelist_entry = Whitelist.query.get_or_404(entry_id)
+    username = whitelist_entry.username
 
-	if whitelist_entry.xuid == current_user.xuid:
-		flash('You cannot remove your own whitelist entry.', 'error')
-		return redirect(url_for('admin.panel'))
-	
-	if whitelist_entry.get_user() and whitelist_entry.get_user().is_admin():
-		flash('You cannot remove a whitelist entry for another admin.', 'error')
-		return redirect(url_for('admin.panel'))
+    if whitelist_entry.xuid == current_user.xuid:
+        flash('You cannot remove your own whitelist entry.', 'error')
+        return redirect(url_for('admin.panel'))
+    
+    if whitelist_entry.get_user() and whitelist_entry.get_user().is_admin():
+        flash('You cannot remove a whitelist entry for another admin.', 'error')
+        return redirect(url_for('admin.panel'))
 
-	try:
-		whitelist_entry.unwhitelist()
-		db.session.commit()
-		flash(f'{username} was removed from the whitelist.', 'success')
-	except Exception as exc:
-		db.session.rollback()
-		current_app.logger.error(f'Unexpected whitelist remove error: {exc}')
-		flash('An unexpected error occurred while removing this user.', 'error')
+    try:
+        whitelist_entry.unwhitelist()
+        db.session.commit()
+        flash(f'{username} was removed from the whitelist.', 'success')
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error(f'Unexpected whitelist remove error: {exc}')
+        flash('An unexpected error occurred while removing this user.', 'error')
 
-	return redirect(url_for('admin.panel'))
+    return redirect(url_for('admin.panel'))
+
+@admin_bp.route('/update_role/<int:entry_id>', methods=['POST'])
+@admin_required
+def update_role(entry_id: int):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            'success': False,
+            'message': 'No data provided'
+        }), 400
+
+    new_role = data.get('role')     
+
+    if new_role not in ['staff', 'manager', 'admin']:
+        return jsonify({
+            'success': False,
+            'message': f'Invalid role: {new_role}'
+        }), 400
+    
+    whitelist_entry = Whitelist.query.get_or_404(entry_id)
+    user = whitelist_entry.get_user()
+
+    if not user:
+        return jsonify({
+            'success': False,
+            'message': 'No linked user'
+        }), 404
+
+    if user.id == current_user.id and new_role != 'admin':
+        return jsonify({
+            'success': False,
+            'message': 'Cannot change your own role'
+        }), 403
+
+    try:
+        user.role = UserRole.from_string(new_role)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.error(f'Unexpected role update error: {exc}')
+        return jsonify({
+            'success': False,
+            'message': 'An unexpected error occurred while updating the user role.'
+        }), 500
+
+    return jsonify({
+        'success': True,
+        'message': f"{user.username}'s role was updated to {new_role}."
+    })

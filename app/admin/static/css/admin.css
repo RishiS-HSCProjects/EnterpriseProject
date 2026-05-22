@@ -101,6 +101,15 @@
     font-weight: 700;
 }
 
+#main .field-input[type="select"] {
+    margin: 0 auto;
+    padding: 0.5rem auto !important;
+}
+
+#main .field-input[type="select"] option {
+    border: none;
+}
+
 #main .button-icon:hover { color: #7F1D1D; }
 
 /* table */
@@ -115,7 +124,7 @@
 #main .admin-table td {
     padding: 0.6rem 0.5rem;
     text-align: left;
-    vertical-align: top;
+    vertical-align: middle;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 

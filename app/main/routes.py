@@ -462,8 +462,7 @@ def tournament_send_discord(tournament_id: int):
     round_hours_display = int(round_hours) if float(round_hours).is_integer() else round_hours
     message_content = (
         f"# :mega: {tourney.name} Announcement\n\n"
-        f"This tournament will start on <t:{tourney.start_unix}:F> and will conclude on <t:{tourney.end_unix}:F>.\n"
-        f"It will finish <t:{tourney.end_unix}:R>.\n\n"
+        f"This tournament will start on <t:{tourney.start_unix}:F> and will conclude <t:{tourney.end_unix}:R> on <t:{tourney.end_unix}:F>.\n\n"
         f"**Each round will last {round_hours_display} hour{'' if round_hours_display == 1 else 's'}.**"
     )
 
@@ -471,7 +470,7 @@ def tournament_send_discord(tournament_id: int):
         message_content += f"\n### Additional Info\n{message}"
 
     message_content += (
-        "\nTo participate, simply play the game as you normally would during the tournament period."
+        "\nTo participate, simply play the tournament game as you normally would during the tournament period."
         "\nYour kills are automatically counted and tracked at https://ngmc.co/tournament."
     )
 
@@ -479,12 +478,12 @@ def tournament_send_discord(tournament_id: int):
     if any(prizes.get(key) for key in ['overall_first', 'overall_second', 'overall_third']):
         message_content += (
             "\n\n## :trophy: Overall Ranking Prizes\n"
+            "-# Overall Ranking rewards the top 3 players across all rounds. Overall Ranking prizes are cumulative with Per-Round Rewards.\n"
             f"{format_prize_lines({
                 'first': prizes.get('overall_first', 'TBA'),
                 'second': prizes.get('overall_second', 'TBA'),
                 'third': prizes.get('overall_third', 'TBA'),
             })}"
-            "\n-# Overall Ranking rewards the top 3 players across all rounds. Overall Ranking prizes are cumulative with Per-Round Rewards."
         )
     if any(prizes.get(key) for key in ['round_first', 'round_second', 'round_third']):
         message_content += (
@@ -494,14 +493,16 @@ def tournament_send_discord(tournament_id: int):
                 'second': prizes.get('round_second', 'TBA'),
                 'third': prizes.get('round_third', 'TBA'),
             })}"
-            "\n-# Titan Rank rewards are not transferable. Per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable)."
+            "\n-# Please note: Titan Rank rewards are not transferable and are applied immediately on issue. Per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable). All other rewards are cumulative across rounds and overall ranking."
             "\n\n We wish you all the best! Please note that tournament rules and prizes are subject to change. Frequent updates will be posted to <#1466960479485296640>, along with <@&1081345603268792410> pings."
         )
 
     try:
+        from discord_webhook.constants import MessageFlags
         ok = discord_send(
             location=ChannelWebhookUrl.ANNOUNCEMENT_WEBHOOK_URL,
             content=message_content,
+            flags=MessageFlags.SUPPRESS_EMBEDS.value
         )
         if ok:
             tourney.tournament_info_discord_status = True

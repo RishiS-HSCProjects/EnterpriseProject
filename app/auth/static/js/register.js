@@ -42,17 +42,17 @@ function handleVerificationSubmit() {
             data = JSON.parse(text);
         } catch {
             console.error("Server did not return JSON:", text);
-            endLoader();
+            stopLoader();
             return;
         }
 
         if (data.status === "error") {
-            endLoader();
+            stopLoader();
             window.location.href = "/register";
             return;
         }
 
-        endLoader();
+        stopLoader();
 
         if (data.message) console.log("Server message:", data.message);
 
@@ -65,7 +65,7 @@ function handleVerificationSubmit() {
     })
         .catch(error => {
         console.error("Error:", error);
-        endLoader();
+        stopLoader();
     });
 }
 

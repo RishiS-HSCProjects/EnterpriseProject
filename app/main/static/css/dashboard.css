@@ -67,12 +67,13 @@
     justify-content: center;
     align-items: center;
     text-align: center;
-    font-size: clamp(1.9rem, 5.2vw, 3.6rem);
+    font-size: clamp(1.5rem, 3.8vw, 3rem);
     font-weight: 800;
-    line-height: 0.92;
+    line-height: 1;
     color: var(--text-on-primary);
     padding: 0.2rem 0;
-    word-break: break-word;
+    word-break: normal;
+    overflow-wrap: anywhere;
 }
 
 #kpi-panel .kpi-card .kpi-bottom {

@@ -15,6 +15,14 @@ class UserRole(Enum):
     def __str__(self):
         return self.name.capitalize()
 
+    @classmethod
+    def from_string(cls, role_str):
+        role_str = role_str.strip().lower()
+        for role in cls:
+            if role.name.lower() == role_str:
+                return role
+        raise ValueError(f"Invalid role string: '{role_str}'")
+
 class User(UserMixin, db.Model):
     """User model for staff, managers, and admins."""
     __tablename__ = 'users'

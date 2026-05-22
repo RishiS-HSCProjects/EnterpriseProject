@@ -27,6 +27,7 @@ def send(
     username: str = "Enterprise Project Bot",
     header: str | None = None,
     timeout: int = 10,
+    **kwargs
 ) -> bool:
     """Send a message to a Discord webhook channel.
 
@@ -42,6 +43,8 @@ def send(
             content=content,
             username=username,
             timeout=timeout,
+            rate_limit_retry=True,
+            **kwargs
         )
 
         response = webhook.execute()

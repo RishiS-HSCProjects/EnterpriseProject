@@ -143,8 +143,7 @@ def verify_registration_pin():
 
     from app.models.otp_log import OtpLog, OtpLogNotFound, OtpLogExpired
     try:
-        pin = verify_form.pin.data or ''
-        otp_verify = OtpLog.verify_otp(pending.get('xuid'), pin)
+        otp_verify = OtpLog.verify_otp(pending.get('xuid'), verify_form.pin.data or '')
     except OtpLogNotFound as exc:
         verify_form.pin.errors = [*verify_form.pin.errors, str(exc)]
         return fail()

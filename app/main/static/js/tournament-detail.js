@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Unexpected error caching tournament stats:', error);
                 sendFlashMessage('Unexpected error caching tournament stats.', 'error');
             } finally {
-                if (typeof endLoader === 'function') endLoader();
+                stopLoader();
                 if (button) {
                     button.disabled = false;
                     button.textContent = originalText;

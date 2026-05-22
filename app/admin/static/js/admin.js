@@ -89,3 +89,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
     applyWhitelistFilters();
 });
+
+function updateRole(entryId, selectElement) {
+    const previousRole = selectElement.dataset.previous;
+    const newRole = selectElement.value;
+
+    selectElement.disabled = true;
+    startLoader();
+
+    fetch(`/admin/update_role/${entryId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector(
+                'input[name="csrf_token"]'
+            ).value
+        },
+        body: JSON.stringify({
+            role: newRole
+        })
+    })
+    .then(async response => {
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                'Failed to update role.'
+            );
+        }
+
+        return data;
+    })
+    .then(data => {
+        selectElement.dataset.previous = newRole;
+
+        sendFlashMessage(
+            data.message ||
+            'User role updated successfully.',
+            'success'
+        );
+    })
+    .catch(error => {
+        selectElement.value = previousRole;
+
+        sendFlashMessage(
+            error.message ||
+            'An error occurred while updating user role.',
+            'error'
+        );
+    })
+    .finally(() => {
+        selectElement.disabled = false;
+        stopLoader();
+    });
+}

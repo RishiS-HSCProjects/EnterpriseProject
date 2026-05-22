@@ -6,7 +6,7 @@ function startLoader() {
     }
 }
 
-function endLoader() {
+function stopLoader() {
     if (loaderContainer) {
         loaderContainer.setAttribute('hidden', '');
     }

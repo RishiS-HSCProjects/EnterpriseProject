@@ -27,6 +27,8 @@
         </div>
     </form>
 
+    <br>
+
     <h2>Current Whitelist</h2>
     <div class="admin-controls">
         <input id="whitelist-search" class="field-input" placeholder="Search username or XUID" />
@@ -50,6 +52,7 @@
                         <th>Registered</th>
                         <th>Last Login</th>
                         <th>Whitelisted At</th>
+                        <th>Role</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -67,10 +70,19 @@
                                 {{ entry.whitelisted_at.strftime('%Y-%m-%d %H:%M') if entry.whitelisted_at else 'N/A' }}
                             </td>
                             <td>
-                                {% if user and user.is_admin() %}
-                                {% else %}
+                                <form>
+                                    {{ empty_form.hidden_tag() }}
+                                    <select name="role" id="role-{{ entry.id }}" onchange="updateRole({{ entry.id }}, this)" class="field-input" data-previous="{{ user.role.name.lower() if user else 'staff' }}">
+                                        <option value="staff" selected>Staff</option>
+                                        <option value="manager" {% if user and user.is_manager() %} selected {% endif %}>Manager</option>
+                                        <option value="admin" {% if user and user.is_admin() %} selected {% endif %}>Admin</option>
+                                    </select>
+                                </form>
+                            </td>
+                            <td>
+                                {% if user and user.is_admin() %}{% else %}
                                 <form method="POST" action="{{ url_for('admin.whitelist_remove', entry_id=entry.id) }}" onsubmit="return confirm('Remove this whitelist entry?');" class="admin-remove-form">
-                                    {{ remove_form.hidden_tag() }}
+                                    {{ empty_form.hidden_tag() }}
                                     <button type="submit" class="button-icon" title="Remove from whitelist">×</button>
                                 </form>
                                 {% endif %}
