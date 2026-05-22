@@ -736,6 +736,7 @@ class Tournament(db.Model):
         end_unix: int,
         round_count: int,
         created_by: int,
+        tournament_info_discord_message: str | None = None,
         prizes: TournamentPrizes | None = None,
     ) -> 'Tournament':
         """Factory method to create a new tournament using unix timestamps."""
@@ -752,6 +753,8 @@ class Tournament(db.Model):
         tournament.created_by = created_by
         from app.models.user import User
         tournament.created_by_xuid = user.xuid if (user := User.query.get(created_by)) else None
+        message = (tournament_info_discord_message or '').strip()
+        tournament.tournament_info_discord_message = message or None
         tournament.prizes = prizes.to_dict() if prizes else {}
         db.session.add(tournament)
         db.session.commit()

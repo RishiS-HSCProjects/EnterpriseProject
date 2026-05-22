@@ -199,6 +199,7 @@ def scheduler(open_add_modal=False):
                         end_unix=end,
                         round_count=rounds,
                         created_by=current_user.id,
+                        tournament_info_discord_message=(add_form.discord_message.data or '').strip(),
                         prizes=TournamentPrizes(
                             overall_first=(add_form.global_first_prize.data or '').strip(),
                             overall_second=(add_form.global_second_prize.data or '').strip(),
