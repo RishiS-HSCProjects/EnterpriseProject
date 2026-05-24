@@ -7,11 +7,18 @@ const FLASH_DURATION = 10000; // Duration to show message (ms)
 const FLASH_STAGGER = 500;    // Delay between showing multiple messages (ms)
 
 document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('flash-container');
+    if (!container) {
+        return;
+    }
+
     const messages = Array.from(
-        document.querySelectorAll('#flash-container .flash-message')
+        container.querySelectorAll('.flash-message')
     );
 
-    messages.forEach((msg, index) => initFlashMessage(msg, index));
+    updateFlashContainerVisibility(container);
+
+    messages.forEach((msg, index) => initFlashMessage(msg, index, container));
 });
 
 /**
@@ -21,38 +28,45 @@ document.addEventListener('DOMContentLoaded', () => {
  * @param {HTMLElement} msg - The flash message element to initialize.
  * @param {number} index - The index for staggered display timing.
  */
-function initFlashMessage(msg, index = 0) {
+function initFlashMessage(msg, index = 0, container = document.getElementById('flash-container')) {
     // Stagger display
     setTimeout(() => {
-        msg.classList.add('show');
+        if (container) {
+            updateFlashContainerVisibility(container, true);
+        }
 
-        // Force reflow so transitions don't skip
-        void msg.offsetWidth;
+        msg.style.display = 'flex'; // Ensure the message is visible for animation
+        setTimeout(() => {
+            msg.classList.add('show');
 
-        // Initialize internal state
-        msg.remaining = FLASH_DURATION;
-        msg.lastTick = Date.now();
-        msg.fadeOutStarted = false;
-        msg.timer = requestAnimationFrame(() => tick(msg));
+            // Force reflow so transitions don't skip
+            void msg.offsetWidth;
 
-        // Hover to pause timer
-        msg.addEventListener('mouseenter', () => {
-            if (msg.fadeOutStarted) return;
-            pauseTimer(msg);
-        });
+            // Initialize internal state
+            msg.remaining = FLASH_DURATION;
+            msg.lastTick = Date.now();
+            msg.fadeOutStarted = false;
+            msg.timer = requestAnimationFrame(() => tick(msg));
 
-        // Hover to resume timer (with bonus time)
-        msg.addEventListener('mouseleave', () => {
-            if (msg.fadeOutStarted) return;
-            msg.remaining = Math.min(msg.remaining + 2000, FLASH_DURATION);
-            resumeTimer(msg);
-        });
+            // Hover to pause timer
+            msg.addEventListener('mouseenter', () => {
+                if (msg.fadeOutStarted) return;
+                pauseTimer(msg);
+            });
 
-        // Click to dismiss immediately
-        msg.addEventListener('click', () => {
-            pauseTimer(msg);
-            fadeOut(msg);
-        });
+            // Hover to resume timer (with bonus time)
+            msg.addEventListener('mouseleave', () => {
+                if (msg.fadeOutStarted) return;
+                msg.remaining = Math.min(msg.remaining + 2000, FLASH_DURATION);
+                resumeTimer(msg);
+            });
+
+            // Click to dismiss immediately
+            msg.addEventListener('click', () => {
+                pauseTimer(msg);
+                fadeOut(msg);
+            });
+        }, 100);
 
     }, index * FLASH_STAGGER);
 }
@@ -110,6 +124,8 @@ function resumeTimer(msg) {
 function fadeOut(msg) {
     if (msg.fadeOutStarted) return;
 
+    const container = msg.parentElement;
+
     msg.fadeOutStarted = true;
     msg.classList.add('fade-out');
     msg.style.transition = 'opacity 0.45s ease, transform 0.45s ease';
@@ -118,6 +134,9 @@ function fadeOut(msg) {
 
     setTimeout(() => {
         msg.remove();
+        if (container) {
+            updateFlashContainerVisibility(container);
+        }
     }, 450);
 }
 
@@ -148,8 +167,26 @@ function sendFlashMessage(message, category = 'info') {
 
     // Add to container
     container.appendChild(msg);
+    updateFlashContainerVisibility(container, true);
 
     // Initialize with staggered timing
     const messageCount = container.querySelectorAll('.flash-message:not(.fade-out)').length;
-    initFlashMessage(msg, messageCount - 1);
+    initFlashMessage(msg, messageCount - 1, container);
+}
+
+/**
+ * Show or hide the flash container depending on active messages.
+ *
+ * @param {HTMLElement} container - The flash container element.
+ * @param {boolean} forceVisible - Force the container to display while messages are being added.
+ */
+function updateFlashContainerVisibility(container, forceVisible = false) {
+    const activeMessages = container.querySelectorAll('.flash-message:not(.fade-out)').length;
+
+    if (forceVisible || activeMessages > 0) {
+        container.style.display = 'flex';
+        return;
+    }
+
+    container.style.display = 'none';
 }

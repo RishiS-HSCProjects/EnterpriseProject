@@ -5,28 +5,30 @@
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/dashboard.css') }}">
+    <script src="{{ url_for('main.static', filename='js/dashboard.js') }}" defer></script>
 {% endblock %}
 
 {% block page_content %}
     {% if kpis %}
     <div id="kpi-panel">
         {% for kpi in kpis %}
-        {{ kpi_macro(title=kpi.title, value=kpi.value, detail=kpi.detail, hover_text=kpi.hover_text, card_id='kpi-' ~ loop.index, href=kpi.href) }}
+        {{ kpi_macro(title=kpi.title, value=kpi.value, detail=kpi.detail, hover_text=kpi.hover_text, card_id='kpi-' ~ loop.index, href=kpi.href, attrs=kpi.attrs) }}
         {% endfor %}
     </div>
     <hr>
     {% endif %}
 {% endblock %}
 
-{% macro kpi_macro(title, value, detail, hover_text, card_id, href=None) %}
+{% macro kpi_macro(title, value, detail, hover_text, card_id, href=None, attrs=None) %}
+{% set attrs = attrs or {} %}
 {% if href %}
-<a class="kpi-card kpi-link" id="{{ card_id }}" href="{{ href }}" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}">
+<a class="kpi-card kpi-link" id="{{ card_id }}" href="{{ href }}" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}"{% for attr_name, attr_value in attrs.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
     <h3 class="kpi-top">{{ title }}</h3>
     <div class="kpi-value">{{ value }}</div>
     <p class="kpi-bottom">{{ detail }}</p>
 </a>
 {% else %}
-<article class="kpi-card" id="{{ card_id }}" role="group" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}">
+<article class="kpi-card" id="{{ card_id }}" role="group" aria-label="{{ title }}. {{ value }}. {{ detail }}" title="{{ hover_text }}"{% for attr_name, attr_value in attrs.items() %} {{ attr_name }}="{{ attr_value }}"{% endfor %}>
     <h3 class="kpi-top">{{ title }}</h3>
     <div class="kpi-value">{{ value }}</div>
     <p class="kpi-bottom">{{ detail }}</p>

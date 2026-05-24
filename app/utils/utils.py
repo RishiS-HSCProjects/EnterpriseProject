@@ -165,6 +165,10 @@ def flash_all_form_errors(form) -> None:
             field = getattr(form, field_name, None)
             field_label = getattr(field, 'label', None)
 
+            if 'csrf_token' in field_name.lower():
+                flash("Your session has expired. Please try again.", 'error')
+                continue
+
             if field_label:
                 label_text = field_label.text
             else:

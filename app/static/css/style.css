@@ -131,3 +131,45 @@ a:hover {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+@media (max-width: 768px) {
+    body {
+        background-attachment: scroll;
+        font-size: 15px;
+    }
+
+    main,
+    footer {
+        width: calc(100% - 1rem);
+    }
+
+    main {
+        padding: 1.5rem 0 2rem;
+    }
+
+    footer {
+        padding-top: 0.75rem;
+    }
+
+    #loader-container #loader {
+        width: min(220px, 48vmin);
+        height: min(220px, 48vmin);
+    }
+
+    #loader-container #loader::before {
+        width: 84px;
+        height: 84px;
+        border-width: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    main {
+        width: calc(100% - 0.75rem);
+        padding: 1.25rem 0 1.75rem;
+    }
+
+    footer {
+        width: calc(100% - 0.75rem);
+    }
+}

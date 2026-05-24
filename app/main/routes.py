@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify
+from dataclasses import dataclass, field
+from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify, abort
 from flask_login import current_user, login_required
 from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes, RewardPackageTypes
 from app.utils.utils import flash, flash_all_form_errors, restore_form_state, save_form_state
@@ -18,6 +18,7 @@ def dashboard():
         detail: str = ""
         hover_text: str = ""
         href: str | None = None
+        attrs: dict[str, str] = field(default_factory=dict)
 
     def _format_days(value: int) -> str:
         return "1" if value == 1 else str(value)
@@ -67,7 +68,8 @@ def dashboard():
             title="Status",
             value="LIVE",
             detail=active_tournament.name,
-            hover_text=f"Started {datetime.fromtimestamp(active_tournament.start_unix, UTC).strftime('%a, %d %b %Y %H:%M UTC')}"
+            hover_text=f"Started {datetime.fromtimestamp(active_tournament.start_unix, UTC).strftime('%a, %d %b %Y %H:%M UTC')}",
+            href=url_for('main.tournament_editor', tournament_id=active_tournament.id)
         ))
         kpis.append(KPI(
             title="Round Duration",
@@ -76,18 +78,23 @@ def dashboard():
             hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds."
         ))
     elif next_tournament:
-        days_until = max(0, (next_tournament.start_unix - now_ts + 86399) // 86400)
         kpis.append(KPI(
-            title="Days to Next Tourney",
-            value=_format_days(days_until),
-            detail=_format_day_label(days_until),
-            hover_text=f"Next tournament: {next_tournament.name}"
+            title="Time to Next Tourney",
+            value="",
+            detail="until start",
+            hover_text=f"Next tournament: {next_tournament.name} starts at {datetime.fromtimestamp(next_tournament.start_unix, UTC).astimezone().strftime('%a, %d %b %Y %H:%M %Z')}",
+            href=url_for('main.tournament_editor', tournament_id=next_tournament.id),
+            attrs={
+                "data-kpi-kind": "countdown",
+                "data-kpi-target-unix": str(next_tournament.start_unix),
+            },
         ))
         kpis.append(KPI(
             title="Status",
             value="UP NEXT",
             detail=next_tournament.name,
-            hover_text="No tournament is currently running."
+            hover_text="No tournament is currently running.",
+            href=url_for('main.tournament_editor', tournament_id=next_tournament.id)
         ))
         kpis.append(KPI(
             title="Round Duration",
@@ -96,13 +103,14 @@ def dashboard():
             hover_text=f"Future tournament round length: {next_tournament.round_duration:.0f} seconds."
         ))
     else:
-        if tournaments:
-            days_ago = max(0, (now_ts - tournaments[-1].end_unix) // 86400)
+        if last_tournament:
+            days_ago = max(0, (now_ts - last_tournament.end_unix) // 86400)
             kpis.append(KPI(
                 title="Last Tournament",
                 value=_format_days(days_ago),
                 detail=f"{_format_day_label(days_ago)} ago",
-                hover_text=f"Last tournament: {tournaments[-1].name}"
+                href=url_for('main.tournament_editor', tournament_id=last_tournament.id),
+                hover_text=f"Last tournament: {last_tournament.name}"
             ))
         else:
             kpis.append(KPI(
