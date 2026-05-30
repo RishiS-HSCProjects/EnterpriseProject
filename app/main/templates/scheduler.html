@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block scripts %}
+    <script src="{{ url_for('main.static', filename='js/time-utils.js') }}"></script>
     <script src="{{ url_for('main.static', filename='js/scheduler.js') }}"></script>
 {% endblock %}
 
@@ -74,7 +75,7 @@
             <div class="form-group">
                 <label class="field-label">Start Date (UTC Midnight)</label>
                 <input type="date" id="start-date-picker" class="field-input" />
-                <div class="time-preview" id="start-preview"></div>
+                <p class="time-info" id="start-info"></p>
                 {{ add_form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
                 {% if add_form.start_unix.errors %}
                     <div class="field-errors">
@@ -89,7 +90,7 @@
             <div class="form-group">
                 <label class="field-label">End Date (UTC Midnight)</label>
                 <input type="date" id="end-date-picker" class="field-input" />
-                <div class="time-preview" id="end-preview"></div>
+                <p class="time-info" id="end-info"></p>
                 {{ add_form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
                 {% if add_form.end_unix.errors %}
                     <div class="field-errors">
@@ -104,7 +105,7 @@
             <div class="form-group">
                 {{ add_form.round_count.label(class="field-label") }}
                 {{ add_form.round_count(class="field-input", id="round-count-input") }}
-                <div class="time-preview" id="round-duration-preview"></div>
+                <p class="time-info" id="round-duration-preview"></p>
                 {% if add_form.round_count.errors %}
                     <div class="field-errors">
                         {% for error in add_form.round_count.errors %}

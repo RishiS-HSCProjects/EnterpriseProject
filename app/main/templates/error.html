@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% set title = "Error" %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        #actions {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        #actions .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 160px;
+            padding: 12px 18px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+        }
+
+        #actions .btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        #actions .btn:first-child {
+            background: #6c757d;
+            color: #fff;
+        }
+
+        #actions .btn:last-child {
+            background: var(--primary);
+            color: var(--text-on-primary);
+        }
+
+        .error-message {
+            font-size: 16px;
+            font-weight: 500;
+            padding: 16px;
+            margin: 20px 0;
+            border-left: 4px solid #d32f2f;
+            border-radius: 4px;
+        }
+    </style>
+{% endblock %}
+
+{% block page_content %}
+    <p class="error-message">{{ error }}</p>
+    <div id="actions">
+        <a href="javascript:history.back()" class="btn">Go back!</a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn">Go to Dashboard</a>
+    </div>
+{% endblock %}

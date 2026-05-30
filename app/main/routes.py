@@ -6,10 +6,12 @@ from app.utils.utils import flash, flash_all_form_errors, restore_form_state, sa
 from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_lines, format_prize_lines, send as discord_send
 from time import time
 from datetime import datetime, UTC
+from werkzeug.exceptions import HTTPException
 
 main_bp = Blueprint("main", __name__, template_folder="templates", static_folder="static", static_url_path="/main/static")
 
 @main_bp.route('/')
+@main_bp.route('/dashboard')
 def dashboard():
     @dataclass
     class KPI:
@@ -421,6 +423,7 @@ def tournament_editor(tournament_id: int):
             'end_local_title': f"Local: {end_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
             'start_relative_title': f"Relative: {_relative_logic(tourney.start_unix, now_ts)}",
             'end_relative_title': f"Relative: {_relative_logic(tourney.end_unix, now_ts)}",
+            'round_secs': f"{tourney.round_duration:.0f}"
         }
     })
 
@@ -747,3 +750,32 @@ def tournament_delete(tournament_id: int):
         current_app.logger.exception('Failed to delete tournament id=%s', tourney.id)
         flash('Failed to delete tournament. Please contact an administrator.', 'error')
         return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
+
+@main_bp.app_errorhandler(HTTPException)
+def handle_http_exception(e):
+    from app import db
+    db.session.rollback()
+
+    if e.code >= 500:
+        current_app.logger.exception('HTTP error %s: %s', e.code, e)
+    elif e.code >= 400:
+        current_app.logger.debug('HTTP error %s: %s', e.code, e)
+
+    try:
+        return render_template('error.html', error=e.description, code=e.code), e.code
+    except Exception:
+        current_app.logger.exception('Failed to render HTTP error page: %s', e)
+        return f'Error {e.code}: {e.description}', e.code
+
+
+@main_bp.app_errorhandler(Exception)
+def handle_exception(e):
+    from app import db
+    db.session.rollback()
+    current_app.logger.exception('Unhandled exception: %s', e)
+
+    try:
+        return render_template('error.html', error='An unexpected error occurred.', code=500), 500
+    except Exception:
+        current_app.logger.exception('Failed to render error page after exception: %s', e)
+        return 'Error 500: An unexpected error occurred.', 500

@@ -20,6 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(url, '_blank');
     };
 
+    // Epoch duration copy
+    const epochDurSec = document.getElementById('epoch-duration');
+    epochDurSec.addEventListener('click', async () => {
+        if (copyClipboard(epochDurSec.dataset.value)) {
+            sendFlashMessage("Tournament duration copied to clipboard!", 'success');
+        } else {
+            sendFlashMessage("Something went wrong when trying to copy duration to clipboard.", 'error');
+        }
+    });
+
+
     function renderRewardPackages(packages) {
         const list = document.getElementById('reward-packages-list');
         if (!list) return;
@@ -72,14 +83,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const copyText = button.dataset.copyText || '';
                 if (!copyText) return;
 
-                try {
-                    await navigator.clipboard.writeText(copyText);
+                if (copyClipboard(copyText)) {
                     const originalText = button.textContent;
                     button.textContent = 'Copied!';
                     sendFlashMessage('Copied to clipboard.', 'success');
-                } catch (error) {
+                } else {
                     sendFlashMessage('Failed to copy. Please try manually.', 'error');
-                    console.error('Clipboard copy failed: ', error);
                 }
             });
         });
@@ -144,6 +153,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (data.success) {
                     window.location.reload()
+                } else {
+                    // DEBUG: Find out why cold-caching does not work.
+                    console.log(data)
                 }
             } catch (error) {
                 console.error('Unexpected error caching tournament stats:', error);
@@ -208,5 +220,102 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     } catch (e) {
         // ignore
+    }
+
+    try {
+        if (!window.TimeUtils) throw new Error('TimeUtils not loaded');
+
+        const startUnixInput = document.getElementById('start-unix-input');
+        const endUnixInput = document.getElementById('end-unix-input');
+        const startInfo = document.getElementById('start-info');
+        const endInfo = document.getElementById('end-info');
+        const startPicker = document.getElementById('start-date-picker');
+        const endPicker = document.getElementById('end-date-picker');
+
+        const updatePreviewFromUnix = (inputEl, infoEl) => {
+            if (!inputEl || !infoEl) return;
+            const v = parseInt(inputEl.value, 10);
+            if (isNaN(v)) {
+                infoEl.textContent = '';
+                infoEl.title = '';
+                infoEl.style.display = 'none';
+            } else {
+                const { display, utc, relative } = window.TimeUtils.formatDateLocal(v);
+                infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${v}</code>`;
+                infoEl.title = `GMT: ${utc} ・ ${relative}`;
+                infoEl.style.display = 'block';
+            }
+        };
+
+        if (startUnixInput && startInfo) {
+            if (startPicker && startUnixInput.value) startPicker.value = window.TimeUtils.epochToDateInput(parseInt(startUnixInput.value, 10));
+            updatePreviewFromUnix(startUnixInput, startInfo);
+            startUnixInput.addEventListener('input', () => updatePreviewFromUnix(startUnixInput, startInfo));
+        }
+
+        if (endUnixInput && endInfo) {
+            if (endPicker && endUnixInput.value) endPicker.value = window.TimeUtils.epochToDateInput(parseInt(endUnixInput.value, 10));
+            updatePreviewFromUnix(endUnixInput, endInfo);
+            endUnixInput.addEventListener('input', () => updatePreviewFromUnix(endUnixInput, endInfo));
+        }
+
+        if (startPicker && startUnixInput) {
+            startPicker.addEventListener('change', () => {
+                const epoch = window.TimeUtils.dateToEpoch(startPicker.value);
+                if (epoch !== null) {
+                    startUnixInput.value = epoch;
+                    startUnixInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        if (endPicker && endUnixInput) {
+            endPicker.addEventListener('change', () => {
+                const epoch = window.TimeUtils.dateToEpoch(endPicker.value);
+                if (epoch !== null) {
+                    endUnixInput.value = epoch;
+                    endUnixInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // Round duration updates
+        const roundCountInput = document.getElementById('round-count-input');
+        const epochDurationEl = document.getElementById('epoch-duration');
+
+        const updateRoundDuration = () => {
+            if (!epochDurationEl) return;
+            const startVal = startUnixInput ? parseInt(startUnixInput.value, 10) : NaN;
+            const endVal = endUnixInput ? parseInt(endUnixInput.value, 10) : NaN;
+            const roundCountVal = roundCountInput ? parseInt(roundCountInput.value, 10) : NaN;
+
+            if (isNaN(startVal) || isNaN(endVal) || isNaN(roundCountVal) || roundCountVal <= 0 || endVal <= startVal) {
+                const serverVal = parseInt(epochDurationEl.dataset.value, 10);
+                if (!isNaN(serverVal)) {
+                    epochDurationEl.textContent = `Round Duration: ${serverVal} seconds`;
+                    epochDurationEl.dataset.value = serverVal;
+                }
+                return;
+            }
+
+            const totalDuration = endVal - startVal;
+            const roundDuration = totalDuration / roundCountVal;
+            const formatted = window.TimeUtils.formatDuration(roundDuration);
+
+            if (formatted) {
+                epochDurationEl.textContent = `Round Duration: ${formatted.display} (${formatted.seconds} seconds)`;
+                epochDurationEl.dataset.value = formatted.seconds;
+            } else {
+                epochDurationEl.textContent = '';
+            }
+        };
+
+        if (startUnixInput) startUnixInput.addEventListener('input', updateRoundDuration);
+        if (endUnixInput) endUnixInput.addEventListener('input', updateRoundDuration);
+        if (roundCountInput) roundCountInput.addEventListener('input', updateRoundDuration);
+
+        updateRoundDuration();
+    } catch (e) {
+        // TimeUtils not available or error — fail silently
     }
 });

@@ -4,6 +4,7 @@ from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError
 
 load_dotenv()
 
@@ -37,7 +38,12 @@ class Config:
 @login_manager.user_loader
 def load_user(user_id):
     from app.models.user import User
-    return db.session.get(User, int(user_id))
+
+    try:
+        return db.session.get(User, int(user_id))
+    except (ValueError, SQLAlchemyError):
+        db.session.rollback()
+        return None
 
 def create_app():
     """Factory function to create and configure the Flask application instance."""

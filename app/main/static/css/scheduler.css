@@ -203,7 +203,7 @@
     cursor: pointer;
 }
 
-#scheduler-page .time-preview {
+#scheduler-page .time-info {
     margin-top: 0.35rem;
     font-size: 0.85rem;
     color: var(--text-on-background-secondary);

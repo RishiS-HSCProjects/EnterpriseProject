@@ -22,6 +22,7 @@
     <script>
         window.__isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
     </script>
+    <script src="{{ url_for('main.static', filename='js/time-utils.js') }}"></script>
     <script src="{{ url_for('main.static', filename='js/tournament-detail.js') }}"></script>
 {% endblock %}
 
@@ -43,23 +44,28 @@
 
                 <div class="form-group">
                     {{ form.start_unix.label(class="field-label") }}
-                    {{ form.start_unix(class="field-input") }}
-                    <p class="time-info" title="{{ epoch_details.start_local_title }} | {{ epoch_details.start_relative_title }}">
+                    <input type="date" id="start-date-picker" class="field-input" />
+                    {{ form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
+                    <p class="time-info" id="start-info" title="{{ epoch_details.start_local_title }} | {{ epoch_details.start_relative_title }}">
                         {{ epoch_details.start_gmt }}
                     </p>
                 </div>
 
                 <div class="form-group">
                     {{ form.end_unix.label(class="field-label") }}
-                    {{ form.end_unix(class="field-input") }}
-                    <p class="time-info" title="{{ epoch_details.end_local_title }} | {{ epoch_details.end_relative_title }}">
+                    <input type="date" id="end-date-picker" class="field-input" />
+                    {{ form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
+                    <p class="time-info" id="end-info" title="{{ epoch_details.end_local_title }} | {{ epoch_details.end_relative_title }}">
                         {{ epoch_details.end_gmt }}
                     </p>
                 </div>
 
                 <div class="form-group">
                     {{ form.round_count.label(class="field-label") }}
-                    {{ form.round_count(class="field-input") }}
+                    {{ form.round_count(class="field-input", id="round-count-input") }}
+                    <p class="time-info" id="epoch-duration" title="Use this value in the Portal" data-value="{{ epoch_details.round_secs }}">
+                        Round Duration: {{ epoch_details.round_secs }} seconds
+                    </p>
                 </div>
 
                 <div class="form-group">

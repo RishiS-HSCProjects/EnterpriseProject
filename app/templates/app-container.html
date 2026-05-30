@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-AU">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -112,6 +112,18 @@
                 alert('Note: This site is best viewed on a desktop. The UI may not be suited for small or touch devices.');
             }
         });
+    </script>
+
+    <script>
+        async function copyClipboard(copyText) {
+            try {
+                await navigator.clipboard.writeText(copyText);
+                return true;
+            } catch (error) {
+                console.error('Clipboard copy failed: ', error);
+                return false;
+            }
+        }
     </script>
 
     {% block scripts %}{% endblock %}

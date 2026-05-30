@@ -91,6 +91,10 @@ select.field-input:focus {
     border-radius: 3px;
 }
 
+#epoch-duration {
+    cursor: pointer;
+}
+
 .auth-actions {
     margin-top: 12px;
     display: flex;

@@ -10,72 +10,19 @@ document.addEventListener('DOMContentLoaded', function () {
         autoOpen: modal.dataset.showAddModal === 'true'
     });
 
-    const relativeTime = (dt) => {
-        const diffSec = Math.floor((Date.now() - dt.getTime()) / 1000);
-        const future = diffSec < 0;
-        const abs = Math.abs(diffSec);
-        const units = [
-            { limit: 5, unit: 'second' }, // Just now
-            { limit: 60, unit: 'second' }, // 60
-            { limit: 3600, unit: 'minute', divisor: 60 }, // 60 * 60
-            { limit: 86400, unit: 'hour', divisor: 3600 }, // 24 * 3600
-            { limit: 2592000, unit: 'day', divisor: 86400 }, // Approximate month as 30 days
-            { limit: Infinity, unit: 'month', divisor: 2592000 } // Approximate month as 30 days
-        ];
-
-        for (const { limit, unit, divisor = 1 } of units) {
-            if (abs < limit) {
-                const value = divisor === 1 ? abs : Math.floor(abs / divisor);
-                const s = value !== 1 ? 's' : '';
-                return future ? `in ${value} ${unit}${s}` : `${value} ${unit}${s} ago`;
-            }
-        }
-
-        const years = Math.floor(abs / 31536000);
-        const s = years !== 1 ? 's' : '';
-        return future ? `in ${years} year${s}` : `${years} year${s} ago`;
-    };
-
-    // Display unix timestamp as formatted date with preview
-    const formatDate = (unix) => {
-        const dt = new Date(unix * 1000);
-        const day = String(dt.getDate()).padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const month = months[dt.getMonth()];
-        const hour = String(dt.getHours()).padStart(2, '0');
-        const min = String(dt.getMinutes()).padStart(2, '0');
-        return { display: `${day} ${month} ${hour}:${min}`, utc: dt.toUTCString(), relative: relativeTime(dt) };
-    };
+    // Use shared TimeUtils for date formatting and relative times
 
     // Convert displayed datetimes with class 'dt' and data-unix attribute
     document.querySelectorAll('.dt[data-unix]').forEach(el => {
         const unix = parseInt(el.dataset.unix, 10);
-        if (!isNaN(unix)) {
-            const { display, utc, relative } = formatDate(unix);
+        if (!isNaN(unix) && window.TimeUtils && typeof window.TimeUtils.formatDateLocal === 'function') {
+            const { display, utc, relative } = window.TimeUtils.formatDateLocal(unix);
             el.textContent = `Local Time: ${display}`;
             el.title = `GMT: ${utc} ・ ${relative}`;
         }
     });
 
-    // Format duration in seconds to readable format
-    const formatDuration = (seconds) => {
-        if (seconds <= 0) return null;
-        const units = [
-            { limit: 60, unit: 'second' },
-            { limit: 3600, unit: 'minute', divisor: 60 },
-            { limit: 86400, unit: 'hour', divisor: 3600 },
-            { limit: 604800, unit: 'day', divisor: 86400 },
-            { limit: Infinity, unit: 'week', divisor: 604800 }
-        ];
-
-        for (const { limit, unit, divisor = 1 } of units) {
-            if (seconds < limit) {
-                const value = divisor === 1 ? Math.round(seconds) : (seconds / divisor).toFixed(1);
-                const s = value !== 1 && value !== '1.0' ? 's' : '';
-                return { display: `${value} ${unit}${s}`, seconds: Math.round(seconds) };
-            }
-        }
-    };
+    // Use shared TimeUtils.formatDuration
 
     // Update round duration preview when start, end, or round count changes
     const updateRoundDuration = () => {
@@ -93,7 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const totalDuration = endVal - startVal;
         const roundDuration = totalDuration / roundCountVal;
-        const formatted = formatDuration(roundDuration);
+        const formatted = (window.TimeUtils && typeof window.TimeUtils.formatDuration === 'function') ? window.TimeUtils.formatDuration(roundDuration) : null;
 
         if (formatted) {
             previewEl.textContent = `Round duration: ${formatted.display} (${formatted.seconds} seconds)`;
@@ -106,10 +53,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
-    // Wire up unix input preview updates
+    // Wire up unix input preview updates (write into `time-info` elements)
     [
-        { input: 'start-unix-input', preview: 'start-preview' },
-        { input: 'end-unix-input', preview: 'end-preview' }
+        { input: 'start-unix-input', preview: 'start-info' },
+        { input: 'end-unix-input', preview: 'end-info' }
     ].forEach(({ input, preview }) => {
         const inputEl = document.getElementById(input);
         const previewEl = document.getElementById(preview);
@@ -121,9 +68,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 previewEl.textContent = '';
                 previewEl.title = '';
                 previewEl.style.display = 'none';
-            } else {
-                const { display, utc, relative } = formatDate(v);
-                previewEl.textContent = display;
+            } else if (window.TimeUtils && typeof window.TimeUtils.formatDateLocal === 'function') {
+                const { display: local, utc, relative } = window.TimeUtils.formatDateLocal(v);
+                // show both local display and epoch value
+                previewEl.innerHTML = `${local} | Epoch: <code>${v}</code>`;
                 previewEl.title = `GMT: ${utc} ・ ${relative}`;
                 previewEl.style.display = 'block';
             }
@@ -137,6 +85,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Date picker to UTC midnight epoch conversion
     const dateToEpoch = (dateValue) => {
+        if (window.TimeUtils && typeof window.TimeUtils.dateToEpoch === 'function') {
+            return window.TimeUtils.dateToEpoch(dateValue);
+        }
         if (!dateValue) return null;
         const [year, month, day] = dateValue.split('-').map(Number);
         const utcDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
