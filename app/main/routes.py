@@ -407,6 +407,11 @@ def tournament_editor(tournament_id: int):
 
         round_leaderboards.append(round_data)
 
+    def _banner_time(dt, ts):
+        local_dt = dt.astimezone()
+        local_text = f"{local_dt.day} {local_dt.strftime('%B %Y at %H:%M')}"
+        return f"{local_text} ({_relative_logic(ts, now_ts)})"
+
     kwargs.update({
         'form': form,
         'leaderboard_overall': tourney.get_leaderboard(round_num=None),
@@ -419,10 +424,12 @@ def tournament_editor(tournament_id: int):
         'epoch_details': {
             'start_gmt': start_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'end_gmt': end_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
-            'start_local_title': f"Local: {start_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
-            'end_local_title': f"Local: {end_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
-            'start_relative_title': f"Relative: {_relative_logic(tourney.start_unix, now_ts)}",
-            'end_relative_title': f"Relative: {_relative_logic(tourney.end_unix, now_ts)}",
+            'start_local_title': f"{start_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            'end_local_title': f"{end_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
+            'start_relative_title': f"{_relative_logic(tourney.start_unix, now_ts)}",
+            'end_relative_title': f"{_relative_logic(tourney.end_unix, now_ts)}",
+            'start_banner_text': _banner_time(start_dt, tourney.start_unix),
+            'end_banner_text': _banner_time(end_dt, tourney.end_unix),
             'round_secs': f"{tourney.round_duration:.0f}"
         }
     })

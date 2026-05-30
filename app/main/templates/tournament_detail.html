@@ -46,7 +46,7 @@
                     {{ form.start_unix.label(class="field-label") }}
                     <input type="date" id="start-date-picker" class="field-input" />
                     {{ form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
-                    <p class="time-info" id="start-info" title="{{ epoch_details.start_local_title }} | {{ epoch_details.start_relative_title }}">
+                    <p class="time-info" id="start-info" title="Local: {{ epoch_details.start_local_title }} ({{ epoch_details.start_relative_title }})">
                         {{ epoch_details.start_gmt }}
                     </p>
                 </div>
@@ -55,7 +55,7 @@
                     {{ form.end_unix.label(class="field-label") }}
                     <input type="date" id="end-date-picker" class="field-input" />
                     {{ form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
-                    <p class="time-info" id="end-info" title="{{ epoch_details.end_local_title }} | {{ epoch_details.end_relative_title }}">
+                    <p class="time-info" id="end-info" title="Local: {{ epoch_details.end_local_title }} ({{ epoch_details.end_relative_title }})">
                         {{ epoch_details.end_gmt }}
                     </p>
                 </div>
@@ -220,85 +220,119 @@
         </div>
 
         <div class="editor-right">
-            <h3 class="leaderboard-heading">Leaderboard - Overall</h3>
-            {% if leaderboard_overall %}
-                <ol class="leaderboard-list">
-                    {% set entries = leaderboard_overall.get_entries(limit=10) %}
-                    {% for p in entries %}
-                        <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }}</li>
-                    {% else %}
-                        <li>No leaderboard data available.</li>
-                    {% endfor %}
-                </ol>
-            {% else %}
-                <p>No leaderboard data available.</p>
-            {% endif %}
-
-            <hr>
-
-            <h3 class="leaderboard-heading">Round Leaderboards</h3>
-            {% if round_leaderboards %}
-                <div class="form-group">
-                    <label for="round-selector" class="field-label">Select Round</label>
-                    <select id="round-selector" class="field-input">
-                        {% for round_data in round_leaderboards %}
-                            <option value="{{ round_data.round_num }}" {% if selected_round == round_data.round_num %}selected{% endif %}>
-                                Round {{ round_data.round_num }}
-                            </option>
-                        {% endfor %}
-                    </select>
+            {% if tournament.is_expired %}
+                <div class="tournament-status-banner">
+                    <p class="banner-title">This tournament has ended.</p>
+                    <p class="banner-copy">Final results are shown below.</p>
                 </div>
-
-                {% for round_data in round_leaderboards %}
-                    <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
-                        <h4 class="leaderboard-heading">Winners</h4>
+            {% elif tournament.is_ongoing %}
+                <div class="tournament-status-banner">
+                    <p class="banner-title">This tournament is currently ongoing.</p>
+                    <p class="banner-copy">Live updates are available on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer">Portal</a>.</p>
+                </div>
+            {% endif %}
+            {% if tournament.is_upcoming %}
+                <div class="tournament-status-banner">
+                    <p class="banner-title">This tournament has not started yet.</p>
+                    <p class="banner-copy">Leaderboards will appear once the tournament begins.</p>
+                    <p class="banner-meta">Starts: {{ epoch_details.start_banner_text }}</p>
+                </div>
+            {% else %}
+                <h3 class="leaderboard-heading">Leaderboard - Overall</h3>
+                {% if leaderboard_overall %}
+                    {% set entries = leaderboard_overall.get_entries(limit=10) %}
+                    {% if entries|length > 0 %}
                         <ol class="leaderboard-list">
-                            {% for p in round_data.leaderboard.get_top(10) %}
-                                <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }} kills</li>
+                            {% for p in entries %}
+                                <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }}</li>
                             {% else %}
                                 <li>No leaderboard data available.</li>
                             {% endfor %}
                         </ol>
-                    </section>
-                {% endfor %}
-            {% else %}
-                <p>No round leaderboards available yet.</p>
-            {% endif %}
+                    {% else %}
+                        <div class="no-results">
+                            <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <p>No leaderboard data available.</p>
+                {% endif %}
 
-            {% if all_disqualified_players %}
-            <hr>
+                <hr>
 
-            <h3 style="color: #ff8c00;">Disqualified Players</h3>
-            <div style="background: rgba(255, 140, 0, 0.05); padding: 16px; border-radius: 4px;">
-                <ul style="list-style: none; padding: 0; margin: 0;">
-                    {% for player_name, disq_rounds in all_disqualified_players.items() %}
-                        <li style="margin-bottom: 16px; padding: 12px; background: rgba(255, 140, 0, 0.08); border-left: 3px solid #ff8c00; border-radius: 2px;">
-                            <strong>{{ player_name }}</strong>
-                            {% for round_entry in disq_rounds %}
-                                <br>
-                                <small style="color: #bbb;">Round {{ round_entry.round }}:</small>
-                                {% for punishment in round_entry.punishments %}
-                                    <br>
-                                    <span style="font-size: 0.9em;">
-                                        <strong>{{ punishment.type }}</strong>: Issued {{ punishment.issued_date }} — Expires {{ punishment.end_date }}
-                                    </span>
-                                    <br>
-                                    <small style="color: #999;">Reason: {{ punishment.reason }}</small>
-                                {% endfor %}
+                <h3 class="leaderboard-heading">Round Leaderboards</h3>
+                {% if round_leaderboards %}
+                    <div class="form-group">
+                        <label for="round-selector" class="field-label">Select Round</label>
+                        <select id="round-selector" class="field-input">
+                            {% for round_data in round_leaderboards %}
+                                <option value="{{ round_data.round_num }}" {% if selected_round == round_data.round_num %}selected{% endif %}>
+                                    Round {{ round_data.round_num }}
+                                </option>
                             {% endfor %}
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
+                        </select>
+                    </div>
 
-            {% if current_user.is_authenticated and current_user.is_manager() and tournament.is_expired %}
-            <hr>
-            <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
-                <h3 class="reward-packages-heading">Stats Packaging</h3>
-                <div id="reward-packages-status" class="reward-packages-status"></div>
-                <ul id="reward-packages-list" class="reward-packages-list"></ul>
-            </div>
+                    {% for round_data in round_leaderboards %}
+                        <section data-round-leaderboard="{{ round_data.round_num }}" {% if selected_round != round_data.round_num %}hidden{% endif %}>
+                            <h4 class="leaderboard-heading">Winners</h4>
+                            {% set leaderboard_entries = round_data.leaderboard.get_top(10) %}
+                            {% if leaderboard_entries|length > 0 %}
+                            <ol class="leaderboard-list">
+                                {% for p in leaderboard_entries %}
+                                    <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }} kills</li>
+                                {% else %}
+                                    <div class="no-results">
+                                        <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                                    </div>
+                                {% endfor %}
+                            </ol>
+                            {% else %}
+                            <div class="no-results">
+                                <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                            </div>
+                            {% endif %}
+                        </section>
+                    {% endfor %}
+                {% else %}
+                    <p>No round leaderboards available yet.</p>
+                {% endif %}
+
+                {% if all_disqualified_players %}
+                <hr>
+
+                <h3 style="color: #ff8c00;">Disqualified Players</h3>
+                <div style="background: rgba(255, 140, 0, 0.05); padding: 16px; border-radius: 4px;">
+                    <ul style="list-style: none; padding: 0; margin: 0;">
+                        {% for player_name, disq_rounds in all_disqualified_players.items() %}
+                            <li style="margin-bottom: 16px; padding: 12px; background: rgba(255, 140, 0, 0.08); border-left: 3px solid #ff8c00; border-radius: 2px;">
+                                <strong>{{ player_name }}</strong>
+                                {% for round_entry in disq_rounds %}
+                                    <br>
+                                    <small style="color: #bbb;">Round {{ round_entry.round }}:</small>
+                                    {% for punishment in round_entry.punishments %}
+                                        <br>
+                                        <span style="font-size: 0.9em;">
+                                            <strong>{{ punishment.type }}</strong>: Issued {{ punishment.issued_date }} — Expires {{ punishment.end_date }}
+                                        </span>
+                                        <br>
+                                        <small style="color: #999;">Reason: {{ punishment.reason }}</small>
+                                    {% endfor %}
+                                {% endfor %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if current_user.is_authenticated and current_user.is_manager() and tournament.is_expired %}
+                <hr>
+                <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
+                    <h3 class="reward-packages-heading">Stats Packaging</h3>
+                    <div id="reward-packages-status" class="reward-packages-status"></div>
+                    <ul id="reward-packages-list" class="reward-packages-list"></ul>
+                </div>
+                {% endif %}
             {% endif %}
         </div>
     </div>
