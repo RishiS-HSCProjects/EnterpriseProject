@@ -20,81 +20,134 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(url, '_blank');
     };
 
-    // Epoch duration copy
     const epochDurSec = document.getElementById('epoch-duration');
-    epochDurSec.addEventListener('click', async () => {
-        if (copyClipboard(epochDurSec.dataset.value)) {
-            sendFlashMessage("Tournament duration copied to clipboard!", 'success');
-        } else {
-            sendFlashMessage("Something went wrong when trying to copy duration to clipboard.", 'error');
+    if (epochDurSec) {
+        epochDurSec.addEventListener('click', async () => {
+            if (copyClipboard(epochDurSec.dataset.value)) {
+                sendFlashMessage('Tournament duration copied to clipboard!', 'success');
+            } else {
+                sendFlashMessage('Something went wrong when trying to copy duration to clipboard.', 'error');
+            }
+        });
+    }
+
+    const rewardPackageState = {
+        packages: [],
+        scope: 'round',
+    };
+
+    function bindRewardPackageControls() {
+        const scopeSelect = document.getElementById('reward-package-scope');
+
+        if (scopeSelect) {
+            rewardPackageState.scope = scopeSelect.value || rewardPackageState.scope;
+            scopeSelect.addEventListener('change', () => {
+                rewardPackageState.scope = scopeSelect.value;
+                renderRewardPackages(rewardPackageState.packages);
+            });
         }
-    });
+    }
 
-
-    function renderRewardPackages(packages) {
+    function renderSelectedRewardPackage(packageItem) {
         const list = document.getElementById('reward-packages-list');
         if (!list) return;
 
-        const status = document.getElementById('reward-packages-status');
+        const item = document.createElement('li');
+        item.className = 'reward-package-card';
 
-        if (!Array.isArray(packages) || !packages.length) {
+        const title = document.createElement('div');
+        title.className = 'reward-package-title';
+        title.textContent = packageItem.reward_label || packageItem.reward_type || 'Package';
+        item.appendChild(title);
+
+        const row = document.createElement('div');
+        row.className = 'reward-package-row';
+        item.appendChild(row);
+
+        const meta = document.createElement('div');
+        meta.className = 'reward-package-meta';
+        meta.textContent = packageItem.display_text || 'No recipients';
+        row.appendChild(meta);
+
+        const copyButton = document.createElement('button');
+        copyButton.type = 'button';
+        copyButton.className = 'reward-package-copy';
+        copyButton.textContent = 'Copy';
+        copyButton.dataset.copyText = packageItem.copy_text || '';
+        row.appendChild(copyButton);
+
+        const entries = Array.isArray(packageItem.entries) ? packageItem.entries : [];
+        if (entries.length) {
+            const entryList = document.createElement('ul');
+            entryList.className = 'reward-package-entries';
+
+            entries.forEach((entry) => {
+                const entryItem = document.createElement('li');
+                const roundLabel = entry && entry.round !== null && entry.round !== undefined
+                    ? `Round ${entry.round}`
+                    : (packageItem.reward_scope === 'global' ? 'Overall' : 'Winner');
+                entryItem.textContent = `${roundLabel}: ${entry.player || 'Unknown player'}`;
+                entryList.appendChild(entryItem);
+            });
+
+            item.appendChild(entryList);
+        }
+
+        if (Array.isArray(packageItem.unresolved_players) && packageItem.unresolved_players.length) {
+            const note = document.createElement('div');
+            note.className = 'reward-package-note';
+            note.textContent = 'Skipped: ' + packageItem.unresolved_players.join(', ');
+            item.appendChild(note);
+        }
+
+        copyButton.addEventListener('click', async () => {
+            const copyText = copyButton.dataset.copyText || '';
+            if (!copyText) return;
+
+            if (copyClipboard(copyText)) {
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Copied!';
+                sendFlashMessage('Copied to clipboard.', 'success');
+                window.setTimeout(() => {
+                    copyButton.textContent = originalText;
+                }, 1200);
+            } else {
+                sendFlashMessage('Failed to copy. Please try manually.', 'error');
+            }
+        });
+
+        list.appendChild(item);
+    }
+
+    function renderRewardPackages(packages) {
+        rewardPackageState.packages = Array.isArray(packages) ? packages : [];
+        bindRewardPackageControls();
+
+        const list = document.getElementById('reward-packages-list');
+        const status = document.getElementById('reward-packages-status');
+        if (list) list.innerHTML = '';
+
+        if (!rewardPackageState.packages.length) {
             if (status) status.textContent = 'No packages available yet.';
             return;
         }
 
-        packages.forEach((packageItem) => {
-            const item = document.createElement('li');
-            item.className = 'reward-package-card';
-
-            const title = document.createElement('div');
-            title.className = 'reward-package-title';
-            title.textContent = packageItem.reward_label || packageItem.reward_type || 'Package';
-            item.appendChild(title);
-
-            const row = document.createElement('div');
-            row.className = 'reward-package-row';
-            item.appendChild(row);
-
-            const meta = document.createElement('div');
-            meta.className = 'reward-package-meta';
-            meta.textContent = packageItem.display_text || 'No recipients';
-            row.appendChild(meta);
-
-            const copyButton = document.createElement('button');
-            copyButton.type = 'button';
-            copyButton.className = 'reward-package-copy';
-            copyButton.textContent = 'Copy';
-            copyButton.dataset.copyText = packageItem.copy_text || '';
-
-            if (Array.isArray(packageItem.unresolved_players) && packageItem.unresolved_players.length) {
-                const note = document.createElement('div');
-                note.className = 'reward-package-note';
-                note.textContent = 'Skipped: ' + packageItem.unresolved_players.join(', ');
-                item.appendChild(note);
-            } else {
-                row.appendChild(copyButton);
-            }
-
-            list.appendChild(item);
+        const visiblePackages = rewardPackageState.packages.filter((packageItem) => {
+            return (packageItem.reward_scope || '') === rewardPackageState.scope;
         });
 
-        list.querySelectorAll('.reward-package-copy').forEach((button) => {
-            button.addEventListener('click', async () => {
-                const copyText = button.dataset.copyText || '';
-                if (!copyText) return;
+        if (status) {
+            status.textContent = visiblePackages.length
+                ? `${visiblePackages.length} package${visiblePackages.length === 1 ? '' : 's'} available.`
+                : 'No packages available for this selection.';
+        }
 
-                if (copyClipboard(copyText)) {
-                    const originalText = button.textContent;
-                    button.textContent = 'Copied!';
-                    sendFlashMessage('Copied to clipboard.', 'success');
-                } else {
-                    sendFlashMessage('Failed to copy. Please try manually.', 'error');
-                }
-            });
+        visiblePackages.forEach((packageItem) => {
+            renderSelectedRewardPackage(packageItem);
         });
     }
 
-    async function loadRewardPackages(type = null) { // type='round'; type='global';
+    async function loadRewardPackages() {
         const panel = document.getElementById('reward-packages-panel');
         if (!panel) return;
 
@@ -106,21 +159,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch(`${packageUrl}?type=${encodeURIComponent(type)}`);
-
+            const response = await fetch(packageUrl);
             const data = await response.json();
             if (data.success) {
                 renderRewardPackages(data.packages);
             } else if (status) {
                 status.textContent = 'Unable to load packages';
-                sendFlashMessage(data.message || 'Unable to load packages', 'error')
+                sendFlashMessage(data.message || 'Unable to load packages', 'error');
             }
         } catch (error) {
-            console.error(`Error ${status || ''}`) 
+            console.error(`Error loading reward packages: ${error.message}`, error);
         }
     }
 
-    // Cache tournament stats form handler (AJAX)
     const cacheForm = document.getElementById('cache-stats-form');
     if (cacheForm) {
         cacheForm.addEventListener('submit', async (event) => {
@@ -145,23 +196,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 let data = {};
                 try {
                     data = await response.json();
-                } catch (e) { 
+                } catch (e) {
                     console.error('Failed to parse JSON response:', e);
                     sendFlashMessage('Server error during caching.', 'error');
                     return;
                 }
 
                 if (data.success) {
-                    window.location.reload()
+                    window.location.reload();
                 } else {
-                    // DEBUG: Find out why cold-caching does not work.
-                    console.log(data)
+                    console.log(data);
                 }
             } catch (error) {
                 console.error('Unexpected error caching tournament stats:', error);
                 sendFlashMessage('Unexpected error caching tournament stats.', 'error');
             } finally {
-                stopLoader();
+                if (typeof stopLoader === 'function') stopLoader();
                 if (button) {
                     button.disabled = false;
                     button.textContent = originalText;
@@ -170,10 +220,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    loadRewardPackages('round');
-    loadRewardPackages('global');
+    loadRewardPackages();
 
-    // Delete modal wiring: use centralized setupFormModal if available
     const deleteModal = document.getElementById('delete-modal');
     if (deleteModal) {
         try {
@@ -197,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!pw || !pw.value.trim()) {
                     ev.preventDefault();
                     alert('Please enter your password to confirm deletion.');
-                    pw && pw.focus();
+                    if (pw) pw.focus();
                     return false;
                 }
                 if (!confirm('This will permanently delete the tournament and its data. Are you sure?')) {
@@ -205,18 +253,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     return false;
                 }
                 if (typeof startLoader === 'function') startLoader();
-                // allow submit to proceed
                 return true;
             });
         }
     }
 
-    // If server marked user as unauthenticated, disable form inputs
     try {
         const isAuth = window.__isAuthenticated === true || window.__isAuthenticated === 'true';
         if (!isAuth) {
             const formElements = document.querySelectorAll('#tournament-edit-form input, #tournament-edit-form textarea');
-            formElements.forEach((e) => e.disabled = true);
+            formElements.forEach((element) => {
+                element.disabled = true;
+            });
         }
     } catch (e) {
         // ignore
@@ -234,27 +282,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const updatePreviewFromUnix = (inputEl, infoEl) => {
             if (!inputEl || !infoEl) return;
-            const v = parseInt(inputEl.value, 10);
-            if (isNaN(v)) {
+            const value = parseInt(inputEl.value, 10);
+            if (Number.isNaN(value)) {
                 infoEl.textContent = '';
                 infoEl.title = '';
                 infoEl.style.display = 'none';
             } else {
-                const { display, utc, relative } = window.TimeUtils.formatDateLocal(v);
-                infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${v}</code>`;
-                infoEl.title = `GMT: ${utc} ・ ${relative}`;
+                const { display, utc, relative } = window.TimeUtils.formatDateLocal(value);
+                infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${value}</code>`;
+                infoEl.title = `GMT: ${utc} | ${relative}`;
                 infoEl.style.display = 'block';
             }
         };
 
         if (startUnixInput && startInfo) {
-            if (startPicker && startUnixInput.value) startPicker.value = window.TimeUtils.epochToDateInput(parseInt(startUnixInput.value, 10));
+            if (startPicker && startUnixInput.value) {
+                startPicker.value = window.TimeUtils.epochToDateInput(parseInt(startUnixInput.value, 10));
+            }
             updatePreviewFromUnix(startUnixInput, startInfo);
             startUnixInput.addEventListener('input', () => updatePreviewFromUnix(startUnixInput, startInfo));
         }
 
         if (endUnixInput && endInfo) {
-            if (endPicker && endUnixInput.value) endPicker.value = window.TimeUtils.epochToDateInput(parseInt(endUnixInput.value, 10));
+            if (endPicker && endUnixInput.value) {
+                endPicker.value = window.TimeUtils.epochToDateInput(parseInt(endUnixInput.value, 10));
+            }
             updatePreviewFromUnix(endUnixInput, endInfo);
             endUnixInput.addEventListener('input', () => updatePreviewFromUnix(endUnixInput, endInfo));
         }
@@ -279,27 +331,26 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Round duration updates
         const roundCountInput = document.getElementById('round-count-input');
         const epochDurationEl = document.getElementById('epoch-duration');
 
         const updateRoundDuration = () => {
             if (!epochDurationEl) return;
-            const startVal = startUnixInput ? parseInt(startUnixInput.value, 10) : NaN;
-            const endVal = endUnixInput ? parseInt(endUnixInput.value, 10) : NaN;
-            const roundCountVal = roundCountInput ? parseInt(roundCountInput.value, 10) : NaN;
+            const startValue = startUnixInput ? parseInt(startUnixInput.value, 10) : NaN;
+            const endValue = endUnixInput ? parseInt(endUnixInput.value, 10) : NaN;
+            const roundCountValue = roundCountInput ? parseInt(roundCountInput.value, 10) : NaN;
 
-            if (isNaN(startVal) || isNaN(endVal) || isNaN(roundCountVal) || roundCountVal <= 0 || endVal <= startVal) {
-                const serverVal = parseInt(epochDurationEl.dataset.value, 10);
-                if (!isNaN(serverVal)) {
-                    epochDurationEl.textContent = `Round Duration: ${serverVal} seconds`;
-                    epochDurationEl.dataset.value = serverVal;
+            if (Number.isNaN(startValue) || Number.isNaN(endValue) || Number.isNaN(roundCountValue) || roundCountValue <= 0 || endValue <= startValue) {
+                const serverValue = parseInt(epochDurationEl.dataset.value, 10);
+                if (!Number.isNaN(serverValue)) {
+                    epochDurationEl.textContent = `Round Duration: ${serverValue} seconds`;
+                    epochDurationEl.dataset.value = serverValue;
                 }
                 return;
             }
 
-            const totalDuration = endVal - startVal;
-            const roundDuration = totalDuration / roundCountVal;
+            const totalDuration = endValue - startValue;
+            const roundDuration = totalDuration / roundCountValue;
             const formatted = window.TimeUtils.formatDuration(roundDuration);
 
             if (formatted) {
@@ -316,6 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateRoundDuration();
     } catch (e) {
-        // TimeUtils not available or error — fail silently
+        // TimeUtils not available or error - fail silently
     }
 });

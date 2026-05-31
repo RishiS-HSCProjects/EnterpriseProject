@@ -209,9 +209,17 @@ class AggregationMethod(Enum):
 
 class RewardPackageTypes(Enum):
     """Supported reward packaging targets."""
+    # Highest placements in individual rounds
     ROUND_FIRSTS = 'round_firsts'
     ROUND_SECONDS = 'round_seconds'
     ROUND_THIRDS = 'round_thirds'
+
+    # All players who achieved a specific placement in any round
+    ALL_FIRSTS = 'all_firsts'
+    ALL_SECONDS = 'all_seconds'
+    ALL_THIRDS = 'all_thirds'
+
+    # Overall tournament placements
     GLOBAL_FIRST = 'global_first'
     GLOBAL_SECOND = 'global_second'
     GLOBAL_THIRD = 'global_third'
@@ -251,9 +259,12 @@ class TournamentLeaderboard:
         rounds_data = archives.get('rounds') if isinstance(archives, dict) else {}
 
         if isinstance(rounds_data, dict):
+            # Collect the full disqualification set first so earlier rounds are
+            # excluded even if the punishment is only recorded in a later round.
             for round_data in rounds_data.values():
-                # Pull archived disqualifications into a fast lookup set.
                 self._disqualified_players.update(_round_disqualified_players(round_data))
+
+            for round_data in rounds_data.values():
                 for entry in _leaderboard_entries(round_data, self._disqualified_players):
                     self._entries_cache[entry.player] = self._entries_cache.get(entry.player, 0) + entry.score
 
@@ -452,6 +463,10 @@ class Tournament(db.Model):
         if not isinstance(round_best, dict):
             round_best = {}
 
+        all_winners = reward_packages.get('all_winners')
+        if not isinstance(all_winners, dict):
+            all_winners = {}
+
         round_entries = sorted(
             _leaderboard_entries(round_data, _round_disqualified_players(round_data)),
             key=lambda entry: entry.score,
@@ -475,12 +490,134 @@ class Tournament(db.Model):
                     'score': entry.score,
                 }
 
+            rank_key = str(rank)
+            rank_entries = all_winners.get(rank_key)
+            if not isinstance(rank_entries, list):
+                rank_entries = []
+            rank_entries.append({
+                'player': entry.player,
+                'xuid': xuid,
+                'rank': rank,
+                'round': round_num,
+                'score': entry.score,
+            })
+            all_winners[rank_key] = rank_entries
+
         reward_packages['round_best'] = round_best
+        reward_packages['all_winners'] = all_winners
         archives = self.archives or {}
         if not isinstance(archives, dict):
             archives = {}
         archives['rewardPackages'] = reward_packages
         self.archives = archives
+
+    def _legacy_round_reward_entries(self, target_rank: int) -> list[dict[str, object]]:
+        """Backfill round reward entries from archived rounds when cache data is missing."""
+        round_entries: list[dict[str, object]] = []
+        reward_packages = self._reward_package_cache()
+        round_best = reward_packages.get('round_best') if isinstance(reward_packages, dict) else {}
+        if isinstance(round_best, dict):
+            for entry in round_best.values():
+                if not isinstance(entry, dict) or entry.get('rank') != target_rank:
+                    continue
+
+                xuid = str(entry.get('xuid') or '')
+                if not xuid:
+                    player = entry.get('player')
+                    if isinstance(player, str) and player:
+                        xuid = self._resolve_player_xuid(player) or ''
+                if not xuid:
+                    continue
+
+                round_entries.append({
+                    'player': entry.get('player', ''),
+                    'xuid': xuid,
+                    'rank': entry.get('rank', target_rank),
+                    'round': entry.get('round'),
+                })
+
+        if round_entries:
+            round_entries.sort(key=lambda entry: (entry.get('round', 0) or 0, str(entry.get('player', '')).lower()))
+            return round_entries
+
+        rounds_data = self._get_rounds_data()
+        for round_num in range(1, self.round_count + 1):
+            round_data = rounds_data.get(str(round_num)) if isinstance(rounds_data, dict) else None
+            if not isinstance(round_data, dict):
+                continue
+
+            for entry in sorted(_leaderboard_entries(round_data, _round_disqualified_players(round_data)), key=lambda item: item.score, reverse=True)[:3]:
+                if entry.rank != target_rank:
+                    continue
+
+                xuid = self._resolve_player_xuid(entry.player)
+                if not xuid:
+                    continue
+
+                round_entries.append({
+                    'player': entry.player,
+                    'xuid': xuid,
+                    'rank': entry.rank,
+                    'round': round_num,
+                })
+
+        round_entries.sort(key=lambda entry: (entry.get('round', 0) or 0, str(entry.get('player', '')).lower()))
+        return round_entries
+
+    def _legacy_all_reward_entries(self, target_rank: int) -> list[dict[str, object]]:
+        """Backfill all reward entries from archived rounds when cache data is missing."""
+        reward_packages = self._reward_package_cache()
+        all_winners = reward_packages.get('all_winners') if isinstance(reward_packages, dict) else None
+        if isinstance(all_winners, dict):
+            cached_entries = all_winners.get(str(target_rank))
+            if isinstance(cached_entries, list):
+                normalized_entries: list[dict[str, object]] = []
+                for entry in cached_entries:
+                    if not isinstance(entry, dict):
+                        continue
+
+                    xuid = str(entry.get('xuid') or '')
+                    player = entry.get('player')
+                    if not xuid and isinstance(player, str) and player:
+                        xuid = self._resolve_player_xuid(player) or ''
+                    if not xuid:
+                        continue
+
+                    normalized_entries.append({
+                        'player': entry.get('player', ''),
+                        'xuid': xuid,
+                        'rank': entry.get('rank', target_rank),
+                        'round': entry.get('round'),
+                    })
+
+                if normalized_entries:
+                    normalized_entries.sort(key=lambda entry: (entry.get('round', 0) or 0, str(entry.get('player', '')).lower()))
+                    return normalized_entries
+
+        legacy_entries: list[dict[str, object]] = []
+        rounds_data = self._get_rounds_data()
+        for round_num in range(1, self.round_count + 1):
+            round_data = rounds_data.get(str(round_num)) if isinstance(rounds_data, dict) else None
+            if not isinstance(round_data, dict):
+                continue
+
+            for entry in sorted(_leaderboard_entries(round_data, _round_disqualified_players(round_data)), key=lambda item: item.score, reverse=True)[:3]:
+                if entry.rank != target_rank:
+                    continue
+
+                xuid = self._resolve_player_xuid(entry.player)
+                if not xuid:
+                    continue
+
+                legacy_entries.append({
+                    'player': entry.player,
+                    'xuid': xuid,
+                    'rank': entry.rank,
+                    'round': round_num,
+                })
+
+        legacy_entries.sort(key=lambda entry: (entry.get('round', 0) or 0, str(entry.get('player', '')).lower()))
+        return legacy_entries
 
     def get_reward_package(self, reward_type: str) -> dict[str, object]:
         """Package reward recipients for a selected reward type from cached archive data."""
@@ -489,6 +626,9 @@ class Tournament(db.Model):
             RewardPackageTypes.ROUND_FIRSTS.value: ('round', 1),
             RewardPackageTypes.ROUND_SECONDS.value: ('round', 2),
             RewardPackageTypes.ROUND_THIRDS.value: ('round', 3),
+            RewardPackageTypes.ALL_FIRSTS.value: ('all', 1),
+            RewardPackageTypes.ALL_SECONDS.value: ('all', 2),
+            RewardPackageTypes.ALL_THIRDS.value: ('all', 3),
             RewardPackageTypes.GLOBAL_FIRST.value: ('global', 1),
             RewardPackageTypes.GLOBAL_SECOND.value: ('global', 2),
             RewardPackageTypes.GLOBAL_THIRD.value: ('global', 3),
@@ -521,6 +661,55 @@ class Tournament(db.Model):
                     'rank': entry.get('rank', target_rank),
                     'round': entry.get('round'),
                 })
+
+            if not package_entries:
+                package_entries = self._legacy_round_reward_entries(target_rank)
+        elif reward_scope == 'all':
+            reward_packages = self._reward_package_cache()
+            all_winners = reward_packages.get('all_winners') if isinstance(reward_packages, dict) else {}
+            if isinstance(all_winners, dict):
+                cached_entries = all_winners.get(str(target_rank))
+            else:
+                cached_entries = None
+
+            if isinstance(cached_entries, list):
+                for entry in cached_entries:
+                    if not isinstance(entry, dict):
+                        continue
+
+                    xuid = str(entry.get('xuid') or '')
+                    player = entry.get('player')
+                    if not xuid and isinstance(player, str) and player:
+                        xuid = self._resolve_player_xuid(player) or ''
+
+                    if not xuid:
+                        if isinstance(player, str) and player:
+                            unresolved_players.append(player)
+                        continue
+
+                    package_entries.append({
+                        'player': entry.get('player', ''),
+                        'xuid': xuid,
+                        'rank': entry.get('rank', target_rank),
+                        'round': entry.get('round'),
+                    })
+
+            if not package_entries:
+                legacy_entries = self._legacy_all_reward_entries(target_rank)
+                if legacy_entries:
+                    if not isinstance(reward_packages, dict):
+                        reward_packages = {}
+                    if not isinstance(all_winners, dict):
+                        all_winners = {}
+
+                    all_winners[str(target_rank)] = legacy_entries
+                    reward_packages['all_winners'] = all_winners
+                    archives = self.archives or {}
+                    if not isinstance(archives, dict):
+                        archives = {}
+                    archives['rewardPackages'] = reward_packages
+                    self.archives = archives
+                    package_entries = legacy_entries
         else:
             overall_entries = TournamentLeaderboard(self).get_entries(limit=3)
             if 1 <= target_rank <= len(overall_entries):
@@ -548,22 +737,15 @@ class Tournament(db.Model):
             'ids': tuple(entry['xuid'] for entry in package_entries if entry.get('xuid')),
         }
 
-    def get_reward_packages(self, type=None) -> list[dict[str, object]]:
+    def get_reward_packages(self) -> list[dict[str, object]]:
         """Return all supported reward packages in display order."""
-        if type == 'round': package_order = [
-                (RewardPackageTypes.ROUND_FIRSTS.value, 'Round 1sts'),
-                (RewardPackageTypes.ROUND_SECONDS.value, 'Round 2nds'),
-                (RewardPackageTypes.ROUND_THIRDS.value, 'Round 3rds'),
-            ]
-        elif type == 'global': package_order = [
-            (RewardPackageTypes.GLOBAL_FIRST.value, 'Global 1st'),
-            (RewardPackageTypes.GLOBAL_SECOND.value, 'Global 2nd'),
-            (RewardPackageTypes.GLOBAL_THIRD.value, 'Global 3rd'),
-        ]
-        else: package_order = [
-            (RewardPackageTypes.ROUND_FIRSTS.value, 'Round 1sts'),
-            (RewardPackageTypes.ROUND_SECONDS.value, 'Round 2nds'),
-            (RewardPackageTypes.ROUND_THIRDS.value, 'Round 3rds'),
+        package_order = [
+            (RewardPackageTypes.ROUND_FIRSTS.value, 'Top Rank 1sts'),
+            (RewardPackageTypes.ROUND_SECONDS.value, 'Top Rank 2nds'),
+            (RewardPackageTypes.ROUND_THIRDS.value, 'Top Rank 3rds'),
+            (RewardPackageTypes.ALL_FIRSTS.value, 'All Rank 1sts'),
+            (RewardPackageTypes.ALL_SECONDS.value, 'All Rank 2nds'),
+            (RewardPackageTypes.ALL_THIRDS.value, 'All Rank 3rds'),
             (RewardPackageTypes.GLOBAL_FIRST.value, 'Global 1st'),
             (RewardPackageTypes.GLOBAL_SECOND.value, 'Global 2nd'),
             (RewardPackageTypes.GLOBAL_THIRD.value, 'Global 3rd'),

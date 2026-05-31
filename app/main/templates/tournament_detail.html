@@ -207,7 +207,7 @@
                         <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
                         <h3 id="delete-modal-title" style="margin:0 0 8px 0;">Confirm Delete</h3>
                         <p style="margin:0 0 12px 0;">Enter your password to confirm deletion of "{{ tournament.name }}".</p>
-                        <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required />
+                        <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required autocomplete="current-password" />
                         <div style="text-align:right;">
                             <button type="button" class="auth-button" data-close-modal>Cancel</button>
                             <button type="submit" class="auth-button auth-button-danger" onclick="return confirm('Are you sure you want to delete the tournament "{{ tournament.name }}"? This cannot be undone.');">Delete</button>
@@ -329,6 +329,17 @@
                 <hr>
                 <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
                     <h3 class="reward-packages-heading">Stats Packaging</h3>
+                    <p class="reward-packages-intro">Choose a package type to preview archived winners.</p>
+                    <div id="reward-packages-controls" class="reward-packages-controls">
+                        <div class="reward-package-control-group">
+                            <label for="reward-package-scope" class="reward-package-control-label">Package type</label>
+                            <select id="reward-package-scope" class="reward-package-control-select">
+                                <option value="round">Top Rank (Non-Commulative)</option>
+                                <option value="all">All Rounds (Cumulative)</option>
+                                <option value="global">Global (Overall)</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="reward-packages-status" class="reward-packages-status"></div>
                     <ul id="reward-packages-list" class="reward-packages-list"></ul>
                 </div>

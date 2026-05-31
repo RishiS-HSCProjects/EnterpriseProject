@@ -321,89 +321,85 @@ def tournament_editor(tournament_id: int):
     start_dt = datetime.fromtimestamp(tourney.start_unix, UTC)
     end_dt = datetime.fromtimestamp(tourney.end_unix, UTC)
 
+    def _format_disqualified_punishments(punishments, tournament_start: int) -> list[dict[str, str]]:
+        from app.models.tournament import PunishmentType
+
+        formatted_punishments = []
+        for punishment in punishments:
+            try:
+                punishment_type = PunishmentType[punishment.get('type').upper()]
+                reason = punishment_type.past_tense
+            except KeyError:
+                current_app.logger.error(
+                    "Unknown punishment type provided: %s\nDataset: %s",
+                    punishment.get('type', 'UNKNOWN'),
+                    punishment,
+                )
+                punishment_type = PunishmentType.BAN
+                reason = 'unknown punishment'
+
+            issued_at = punishment.get('issued_at')
+            end_at = punishment.get('end_at')
+            lookback = punishment_type.lookback_seconds
+            lookback_days = lookback // (24 * 60 * 60)
+
+            if not end_at or not tournament_start:
+                current_app.logger.error(
+                    "Timestamps not returned for punishment %s: %s",
+                    punishment.get('id', 'UNKNOWN'),
+                    punishment,
+                )
+                continue
+            if end_at >= tournament_start:
+                reason = f"{reason} during tournament"
+            elif end_at >= tournament_start - lookback:
+                reason = f"{reason} before tournament (within {lookback_days}d lookback)"
+            else:
+                reason = f"{reason} before tournament"
+
+            formatted_punishments.append({
+                'type': punishment_type.name,
+                'issued_date': datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown',
+                'end_date': datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown',
+                'reason': reason,
+            })
+
+        return formatted_punishments
+
+    all_disqualified_players = {}  # {player_name: [list of {round, punishments}]}
+    if tourney.archives and isinstance(tourney.archives.get('rounds'), dict):
+        for round_key, round_archive in tourney.archives['rounds'].items():
+            if not isinstance(round_archive, dict):
+                continue
+            if 'disqualifiedPlayers' not in round_archive:
+                continue
+
+            try:
+                round_number = int(round_key)
+            except (TypeError, ValueError):
+                continue
+
+            for disq_player_data in round_archive['disqualifiedPlayers']:
+                player_name = disq_player_data.get('player', 'Unknown')
+                punishments = disq_player_data.get('punishments', [])
+                formatted_punishments = _format_disqualified_punishments(punishments, tourney.start_unix)
+
+                if player_name not in all_disqualified_players:
+                    all_disqualified_players[player_name] = []
+
+                all_disqualified_players[player_name].append({
+                    'round': round_number,
+                    'punishments': formatted_punishments,
+                })
+
     # Build round leaderboards
     round_leaderboards = []
-    all_disqualified_players = {}  # {player_name: [list of {round, punishments}]}
 
     for r in round_numbers:
         round_data = {
             'round_num': r,
             'leaderboard': tourney.get_leaderboard(round_num=r),
         }
-
-        # Get disqualified players from archive if available
-        if tourney.archives and 'rounds' in tourney.archives:
-            round_key = str(r)
-            if round_key in tourney.archives['rounds']:
-                round_archive = tourney.archives['rounds'][round_key]
-
-                if 'disqualifiedPlayers' in round_archive:
-                    from app.models.tournament import PunishmentType
-                    # Find if disqualified players exist
-                    for disq_player_data in round_archive['disqualifiedPlayers']:
-                        player_name = disq_player_data.get('player', 'Unknown')
-                        punishments = disq_player_data.get('punishments', [])
-
-                        # Format punishments
-                        formatted_punishments = []
-                        for p in punishments:
-                            try:
-                                punishment_type = PunishmentType[p.get('type').upper()]
-                                reason = punishment_type.past_tense
-                            except KeyError:
-                                current_app.logger.error(
-                                    "Unknown punishment type provided: %s\nDataset: %s",
-                                    p.get('type', 'UNKNOWN'), p
-                                )
-                                punishment_type = PunishmentType.BAN # default to ban in the case of errors
-                                reason = "unknown punishment"
-
-                            issued_at = p.get('issued_at')
-                            end_at = p.get('end_at')
-
-                            # Determine reason for disqualification
-                            # Determine reason for disqualification
-                            start = tourney.start_unix
-                            lookback = punishment_type.lookback_seconds
-                            lookback_days = lookback // (24 * 60 * 60) # 24h
-
-                            if not end_at or not start:
-                                # Missing timestamps, assume qualified
-                                current_app.logger.error(
-                                    "Timestamps not returned for punishment %s: %s",
-                                    p.get('id', 'UNKNOWN'), # punishment id
-                                    p # full punishment data
-                                )
-                                continue
-                            elif end_at >= start:
-                                # Punishment active during tournament
-                                reason = f"{reason} during tournament"
-                            elif end_at >= start - lookback:
-                                # Before tournament but within lookback window
-                                reason = f"{reason} before tournament (within {lookback_days}d lookback)"
-                            else:
-                                # Before tournament, outside lookback
-                                reason = f"{reason} before tournament"
-
-                            # Format dates
-                            issued_date = datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown'
-                            end_date = datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown'
-
-                            formatted_punishments.append({
-                                'type': punishment_type.name,
-                                'issued_date': issued_date,
-                                'end_date': end_date,
-                                'reason': reason
-                            })
-
-                        # Aggregate player disqualifications
-                        if player_name not in all_disqualified_players:
-                            all_disqualified_players[player_name] = []
-
-                        all_disqualified_players[player_name].append({
-                            'round': r,
-                            'punishments': formatted_punishments
-                        })
 
         round_leaderboards.append(round_data)
 
@@ -446,7 +442,7 @@ def tournament_package_stats(tournament_id: int):
         return jsonify({'success': False, 'message': f'Tournament {tournament_id} not found.'}), 404
 
     current_app.logger.info(request.method)
-    packages = tourney.get_reward_packages(type=request.args.get('type', None))
+    packages = tourney.get_reward_packages()
     return jsonify({'success': True, 'packages': packages})
 
 def _relative_logic(ts, now_ts):
@@ -773,7 +769,6 @@ def handle_http_exception(e):
     except Exception:
         current_app.logger.exception('Failed to render HTTP error page: %s', e)
         return f'Error {e.code}: {e.description}', e.code
-
 
 @main_bp.app_errorhandler(Exception)
 def handle_exception(e):
