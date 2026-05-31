@@ -70,24 +70,6 @@ def _round_entries(round_data):
 
     return round_data.get('entries') or []
 
-def _round_disqualified_players(round_data) -> set[str]:
-    """Extract disqualified player identifiers already stored for a round."""
-    disqualified: set[str] = set()
-    if not isinstance(round_data, dict):
-        return disqualified
-
-    raw_disqualified = round_data.get('disqualifiedPlayers') or []
-
-    for entry in raw_disqualified:
-        if not isinstance(entry, dict):
-            continue
-
-        player = entry.get('player')
-        if isinstance(player, str) and player:
-            disqualified.add(player)
-
-    return disqualified
-
 def _leaderboard_entries(round_data, excluded_players: set[str] | None = None) -> list['LeaderboardEntry']:
     excluded_players = excluded_players or set()
     raw_entries = _round_entries(round_data)
@@ -108,87 +90,57 @@ def _leaderboard_entries(round_data, excluded_players: set[str] | None = None) -
 
     return entries
 
-def _punishment_is_disqualifying(punishment: NormalizedPunishment, tournament_start: int) -> bool:
-    if punishment.valid_until is None:
-        return True
 
-    cutoff = tournament_start - punishment.type.lookback_seconds
-    # Disqualify if it lasts into the tournament or ended recently before it.
-    return punishment.valid_until >= tournament_start or punishment.valid_until >= cutoff
+def format_punishments_for_ui(punishments, tournament_start: int) -> list[dict[str, str]]:
+    """Format archived punishment dicts for display in templates.
 
-def _normalize_punishment(punishment: dict) -> NormalizedPunishment | None:
-    punishment_type = str(punishment.get('type') or '').upper()
-    if punishment_type not in PunishmentType.__members__:
-        return None
-    punishment_enum = PunishmentType[punishment_type]
+    Accepts punishment records with keys like `type`, `issued_at` and `end_at` (as
+    produced by `_archive_punishment`) and returns a list of simple dicts with
+    human-friendly dates and a `reason` string.
+    """
+    formatted_punishments: list[dict[str, str]] = []
+    for punishment in punishments:
+        try:
+            punishment_type = PunishmentType[str((punishment.get('type') or '').upper())]
+            reason = punishment_type.past_tense
+        except Exception:
+            current_app.logger.error(
+                "Unknown punishment type provided: %s\nDataset: %s",
+                punishment.get('type', 'UNKNOWN'),
+                punishment,
+            )
+            punishment_type = PunishmentType.BAN
+            reason = 'unknown punishment'
 
-    issued_at = punishment.get('issuedAt')
-    if not isinstance(issued_at, int):
-        return None
+        issued_at = punishment.get('issued_at') or punishment.get('issuedAt')
+        end_at = punishment.get('end_at') or punishment.get('endAt')
+        lookback = punishment_type.lookback_seconds
+        lookback_days = lookback // (24 * 60 * 60)
 
-    valid_until = punishment.get('validUntil')
-    if valid_until is not None and not isinstance(valid_until, int):
-        valid_until = None
-
-    player = punishment.get('player')
-    if not isinstance(player, str) or not player:
-        return None
-
-    return NormalizedPunishment(
-        id=punishment.get('id'),
-        type=punishment_enum,
-        issued_at=issued_at,
-        valid_until=valid_until,
-        player=player,
-    )
-
-def _archive_punishment(punishment: NormalizedPunishment) -> ArchivedPunishment:
-    """Store only the punishment fields we actually need later."""
-    return ArchivedPunishment(
-        id=punishment.id,
-        issued_at=punishment.issued_at,
-        end_at=punishment.valid_until,
-        type=punishment.type,
-    )
-
-def _disqualified_players_from_archive(archive_data, tournament_start: int) -> list[dict]:
-    punishments = []
-    if isinstance(archive_data, dict):
-        punishments = archive_data.get('punishmentsNew') or archive_data.get('punishments') or []
-
-    current_app.logger.debug(f"Archive data contains {len(punishments)} raw punishments")
-
-    # Keep the latest BAN and MUTE per player, then apply the time window.
-    latest_by_identifier: dict[str, dict[PunishmentType, NormalizedPunishment]] = {}
-    for raw_punishment in punishments:
-        if not isinstance(raw_punishment, dict):
+        if not end_at or not tournament_start:
+            current_app.logger.error(
+                "Timestamps not returned for punishment %s: %s",
+                punishment.get('id', 'UNKNOWN'),
+                punishment,
+            )
             continue
+        if end_at >= tournament_start:
+            reason = f"{reason} during tournament"
+        elif end_at >= tournament_start - lookback:
+            reason = f"{reason} before tournament (within {lookback_days}d lookback)"
+        else:
+            reason = f"{reason} before tournament"
 
-        normalized = _normalize_punishment(raw_punishment)
-        if not normalized:
-            continue
+        formatted_punishments.append({
+            'type': punishment_type.name,
+            'issued_date': datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown',
+            'end_date': datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown',
+            'reason': reason,
+        })
 
-        by_type = latest_by_identifier.setdefault(normalized.player, {})
-        current = by_type.get(normalized.type)
-        if current is None or normalized.issued_at >= current.issued_at:
-            by_type[normalized.type] = normalized
+    return formatted_punishments
 
-    disqualified: list[dict] = []
-    for identifier, punishments_by_type in latest_by_identifier.items():
-        punishments: list[ArchivedPunishment] = []
-        for punishment in punishments_by_type.values():
-            if not _punishment_is_disqualifying(punishment, tournament_start):
-                continue
-
-            punishments.append(_archive_punishment(punishment))
-
-        if punishments:
-            disqualified.append(DisqualifiedPlayerArchive(identifier, punishments).to_dict())
-
-    current_app.logger.debug(f"Extracted {len(disqualified)} disqualified players from archive")
-    return disqualified
-
-def _store_round_archive(archive_data, disqualified_players: list[dict]):
+def _store_round_archive(archive_data):
     # Always save the round in one shape so leaderboard reads stay simple.
     if isinstance(archive_data, dict):
         entries = list(archive_data.values())
@@ -199,7 +151,6 @@ def _store_round_archive(archive_data, disqualified_players: list[dict]):
 
     return {
         'entries': entries,
-        'disqualifiedPlayers': disqualified_players,
     }
 
 class AggregationMethod(Enum):
@@ -247,7 +198,6 @@ class TournamentLeaderboard:
         self.tournament = tournament
         self._entries_cache: dict[str, int] = {}
         self._best_ranks: dict[str, int] = {}
-        self._disqualified_players: set[str] = set()
         self._loaded = False
 
     def _load(self):
@@ -255,17 +205,13 @@ class TournamentLeaderboard:
         if self._loaded:
             return
 
+        excluded_players = self.tournament.validated_disqualified_players()
         archives = self.tournament.archives or {}
         rounds_data = archives.get('rounds') if isinstance(archives, dict) else {}
 
         if isinstance(rounds_data, dict):
-            # Collect the full disqualification set first so earlier rounds are
-            # excluded even if the punishment is only recorded in a later round.
             for round_data in rounds_data.values():
-                self._disqualified_players.update(_round_disqualified_players(round_data))
-
-            for round_data in rounds_data.values():
-                for entry in _leaderboard_entries(round_data, self._disqualified_players):
+                for entry in _leaderboard_entries(round_data, excluded_players=excluded_players):
                     self._entries_cache[entry.player] = self._entries_cache.get(entry.player, 0) + entry.score
 
         placements = archives.get('placements') if isinstance(archives, dict) else None
@@ -274,7 +220,7 @@ class TournamentLeaderboard:
                 rank = int(place_str)
                 for entry in placement_list or []:
                     player = entry.get('player') if isinstance(entry, dict) else None
-                    if player and player not in self._best_ranks and player not in self._disqualified_players:
+                    if player and player not in excluded_players and player not in self._best_ranks:
                         self._best_ranks[player] = rank
 
         reward_packages = archives.get('rewardPackages') if isinstance(archives, dict) else None
@@ -285,7 +231,7 @@ class TournamentLeaderboard:
                     continue
                 player = cached_entry.get('player')
                 rank = cached_entry.get('rank')
-                if not isinstance(player, str) or not player or not isinstance(rank, int):
+                if not isinstance(player, str) or not player or player in excluded_players or not isinstance(rank, int):
                     continue
                 current_rank = self._best_ranks.get(player)
                 if current_rank is None or rank < current_rank:
@@ -386,6 +332,56 @@ class Tournament(db.Model):
         now = int(datetime.now(UTC).timestamp())
         return now > self.end_unix
 
+    @property
+    def recipients_validated(self) -> bool:
+        """Return whether recipient validation has already completed."""
+        archives = self.archives or {}
+        if not isinstance(archives, dict):
+            return False
+
+        return bool(archives.get('recipients_validated', False))
+
+    def _validation_registry(self) -> dict:
+        """Return the persisted validation payload, if it exists."""
+        archives = self.archives or {}
+        if not isinstance(archives, dict):
+            return {}
+
+        validation = archives.get('validation')
+        return validation if isinstance(validation, dict) else {}
+
+    def _validated_recipients(self) -> dict[str, list[dict[str, object]] | dict[str, dict[str, object]]]:
+        """Return the saved recipient validation payload grouped by reward scope."""
+        validation = self._validation_registry()
+        recipients = validation.get('recipients')
+        return recipients if isinstance(recipients, dict) else {}
+
+    def validated_disqualified_players(self) -> set[str]:
+        """Return the set of players rejected by recipient validation."""
+        validation = self._validation_registry()
+        disqualified_players = validation.get('disqualifiedPlayers') or []
+
+        players: set[str] = set()
+        if isinstance(disqualified_players, list):
+            for entry in disqualified_players:
+                if not isinstance(entry, dict):
+                    continue
+                player = entry.get('player')
+                if isinstance(player, str) and player:
+                    players.add(player)
+
+        return players
+
+    @recipients_validated.setter
+    def recipients_validated(self, value: bool) -> None:
+        """Persist the recipient validation flag inside the archives JSON."""
+        archives = self.archives or {}
+        if not isinstance(archives, dict):
+            archives = {}
+
+        archives['recipients_validated'] = bool(value)
+        self.archives = archives
+
     def get_round_status(self, round_number: int) -> bool:
         """Checks if a specific round has finished."""
         if type(round_number) != int or round_number < 1 or round_number > self.round_count:
@@ -468,7 +464,7 @@ class Tournament(db.Model):
             all_winners = {}
 
         round_entries = sorted(
-            _leaderboard_entries(round_data, _round_disqualified_players(round_data)),
+            _leaderboard_entries(round_data),
             key=lambda entry: entry.score,
             reverse=True,
         )[:3]
@@ -546,7 +542,7 @@ class Tournament(db.Model):
             if not isinstance(round_data, dict):
                 continue
 
-            for entry in sorted(_leaderboard_entries(round_data, _round_disqualified_players(round_data)), key=lambda item: item.score, reverse=True)[:3]:
+            for entry in sorted(_leaderboard_entries(round_data), key=lambda item: item.score, reverse=True)[:3]:
                 if entry.rank != target_rank:
                     continue
 
@@ -601,7 +597,7 @@ class Tournament(db.Model):
             if not isinstance(round_data, dict):
                 continue
 
-            for entry in sorted(_leaderboard_entries(round_data, _round_disqualified_players(round_data)), key=lambda item: item.score, reverse=True)[:3]:
+            for entry in sorted(_leaderboard_entries(round_data), key=lambda item: item.score, reverse=True)[:3]:
                 if entry.rank != target_rank:
                     continue
 
@@ -640,93 +636,76 @@ class Tournament(db.Model):
         reward_scope, target_rank = reward_type_map[normalized_reward_type]
         package_entries: list[dict[str, object]] = []
         unresolved_players: list[str] = []
+        excluded_players = self.validated_disqualified_players()
+        validated_recipients = self._validated_recipients()
+
+        def _normalize_saved_entry(entry: dict | None, default_round: int | None = None) -> dict[str, object] | None:
+            if not isinstance(entry, dict):
+                return None
+
+            player = entry.get('player')
+            xuid = str(entry.get('xuid') or '')
+            if not isinstance(player, str) or not player or player in excluded_players or not xuid:
+                if isinstance(player, str) and player and not xuid:
+                    unresolved_players.append(player)
+                return None
+
+            normalized_entry: dict[str, object] = {
+                'player': player,
+                'xuid': xuid,
+                'rank': int(entry.get('rank') or target_rank),
+            }
+
+            round_num = entry.get('round', default_round)
+            if isinstance(round_num, int):
+                normalized_entry['round'] = round_num
+            elif default_round is not None:
+                normalized_entry['round'] = default_round
+
+            return normalized_entry
+
+        def _round_recipient_key(rank: int) -> str:
+            return {1: 'round_firsts', 2: 'round_seconds', 3: 'round_thirds'}.get(rank, 'round_firsts')
 
         if reward_scope == 'round':
-            reward_packages = self._reward_package_cache()
-            round_best = reward_packages.get('round_best') if isinstance(reward_packages, dict) else {}
-            if not isinstance(round_best, dict):
-                round_best = {}
+            saved_round_entries = validated_recipients.get(_round_recipient_key(target_rank)) or []
+            normalized_entries: list[dict[str, object]] = []
 
-            cached_entries = [
-                entry
-                for entry in round_best.values()
-                if isinstance(entry, dict) and entry.get('rank') == target_rank and isinstance(entry.get('xuid'), str)
-            ]
-            cached_entries.sort(key=lambda entry: (entry.get('round', 0), str(entry.get('player', '')).lower()))
+            if isinstance(saved_round_entries, list):
+                best_entries_by_player: dict[str, dict[str, object]] = {}
+                for entry in saved_round_entries:
+                    normalized = _normalize_saved_entry(entry)
+                    if not normalized or normalized.get('rank') != target_rank:
+                        continue
 
-            for entry in cached_entries:
-                package_entries.append({
-                    'player': entry.get('player', ''),
-                    'xuid': entry.get('xuid', ''),
-                    'rank': entry.get('rank', target_rank),
-                    'round': entry.get('round'),
-                })
+                    player = str(normalized.get('player') or '')
+                    if not player:
+                        continue
 
-            if not package_entries:
-                package_entries = self._legacy_round_reward_entries(target_rank)
+                    current_entry = best_entries_by_player.get(player)
+                    current_round = current_entry.get('round') if isinstance(current_entry, dict) else None
+                    new_round = normalized.get('round') if isinstance(normalized.get('round'), int) else None
+                    if current_entry is None or not isinstance(current_round, int) or (isinstance(new_round, int) and new_round < current_round):
+                        best_entries_by_player[player] = normalized
+
+                normalized_entries = list(best_entries_by_player.values())
+
+            normalized_entries.sort(key=lambda entry: (entry.get('round', 0) or 0, str(entry.get('player', '')).lower()))
+            package_entries = normalized_entries
         elif reward_scope == 'all':
-            reward_packages = self._reward_package_cache()
-            all_winners = reward_packages.get('all_winners') if isinstance(reward_packages, dict) else {}
-            if isinstance(all_winners, dict):
-                cached_entries = all_winners.get(str(target_rank))
-            else:
-                cached_entries = None
-
-            if isinstance(cached_entries, list):
-                for entry in cached_entries:
-                    if not isinstance(entry, dict):
-                        continue
-
-                    xuid = str(entry.get('xuid') or '')
-                    player = entry.get('player')
-                    if not xuid and isinstance(player, str) and player:
-                        xuid = self._resolve_player_xuid(player) or ''
-
-                    if not xuid:
-                        if isinstance(player, str) and player:
-                            unresolved_players.append(player)
-                        continue
-
-                    package_entries.append({
-                        'player': entry.get('player', ''),
-                        'xuid': xuid,
-                        'rank': entry.get('rank', target_rank),
-                        'round': entry.get('round'),
-                    })
-
-            if not package_entries:
-                legacy_entries = self._legacy_all_reward_entries(target_rank)
-                if legacy_entries:
-                    if not isinstance(reward_packages, dict):
-                        reward_packages = {}
-                    if not isinstance(all_winners, dict):
-                        all_winners = {}
-
-                    all_winners[str(target_rank)] = legacy_entries
-                    reward_packages['all_winners'] = all_winners
-                    archives = self.archives or {}
-                    if not isinstance(archives, dict):
-                        archives = {}
-                    archives['rewardPackages'] = reward_packages
-                    self.archives = archives
-                    package_entries = legacy_entries
+            saved_all_entries = validated_recipients.get(_round_recipient_key(target_rank)) or []
+            if isinstance(saved_all_entries, list):
+                for entry in saved_all_entries:
+                    normalized = _normalize_saved_entry(entry)
+                    if normalized and normalized.get('rank') == target_rank:
+                        package_entries.append(normalized)
         else:
-            overall_entries = TournamentLeaderboard(self).get_entries(limit=3)
-            if 1 <= target_rank <= len(overall_entries):
-                selected_players = [overall_entries[target_rank - 1].player]
-            else:
-                selected_players = []
-
-            for player in selected_players:
-                xuid = self._resolve_player_xuid(player)
-                if xuid:
-                    package_entries.append({
-                        'player': player,
-                        'xuid': xuid,
-                        'rank': target_rank,
-                    })
-                else:
-                    unresolved_players.append(player)
+            saved_global_entries = validated_recipients.get('global') or {}
+            if isinstance(saved_global_entries, dict):
+                selected_entry = saved_global_entries.get({1: 'first', 2: 'second', 3: 'third'}.get(target_rank, ''))
+                normalized = _normalize_saved_entry(selected_entry)
+                if normalized and normalized.get('rank') == target_rank:
+                    package_entries.append(normalized)
 
         return {
             'reward_type': normalized_reward_type,
@@ -785,7 +764,7 @@ class Tournament(db.Model):
                 return RoundLeaderboard(round_num, [])
 
             round_data = self._get_rounds_data().get(str(round_num))
-            return RoundLeaderboard(round_num, _leaderboard_entries(round_data, _round_disqualified_players(round_data)))
+            return RoundLeaderboard(round_num, _leaderboard_entries(round_data, excluded_players=self.validated_disqualified_players()))
 
         return TournamentLeaderboard(self)
 
@@ -849,13 +828,7 @@ class Tournament(db.Model):
                     type(data).__name__,
                     list(data.keys())[:10] if isinstance(data, dict) else 'n/a',
                 )
-                # Save the round plus any disqualifications we can infer from the API payload.
-                disq_players = _disqualified_players_from_archive(data, self.start_unix)
-                current_app.logger.debug(f"Round {round_num}: Found {len(disq_players)} disqualified players")
-                rounds_data[round_key] = _store_round_archive(
-                    data,
-                    disq_players,
-                )
+                rounds_data[round_key] = _store_round_archive(data)
                 self._update_reward_package_cache(round_num, rounds_data[round_key])
                 # Reassign the archives mapping to ensure SQLAlchemy detects the in-place
                 # mutation of the JSON column and persists it on commit.
@@ -873,10 +846,9 @@ class Tournament(db.Model):
                         round_num,
                     )
                 current_app.logger.debug(
-                    "Stored archive for round %s with %s entries and %s disqualified players",
+                    "Stored archive for round %s with %s entries",
                     round_num,
                     len(rounds_data[round_key].get('entries', [])),
-                    len(rounds_data[round_key].get('disqualifiedPlayers', [])),
                 )
                 updated = True
                 yield round_num, True

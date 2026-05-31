@@ -8,6 +8,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Expose archived disqualified players (if present) for client-side features
+    try {
+        const disqEl = document.getElementById('disqualified-players');
+        if (disqEl && disqEl.dataset && disqEl.dataset.disqualified) {
+            try {
+                window.__allDisqualifiedPlayers = JSON.parse(disqEl.dataset.disqualified);
+            } catch (e) {
+                console.error('Failed to parse disqualified players JSON:', e);
+                window.__allDisqualifiedPlayers = {};
+            }
+        } else {
+            window.__allDisqualifiedPlayers = {};
+        }
+    } catch (e) {
+        window.__allDisqualifiedPlayers = {};
+    }
+
     showRoundLeaderboard();
     const roundSelector = document.getElementById('round-selector');
     if (roundSelector) {
@@ -19,6 +36,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = 'https://ngmc.co/p/' + encodeURIComponent(playerName);
         window.open(url, '_blank');
     };
+
+    function bindLeaderboardPlayers() {
+        document.querySelectorAll('li[data-player]').forEach((item) => {
+            const playerName = item.dataset.player || '';
+            if (!playerName) return;
+
+            item.setAttribute('role', 'button');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-label', `Open ${playerName} on the Portal`);
+
+            item.addEventListener('click', () => {
+                window.openPortal(playerName);
+            });
+
+            item.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    window.openPortal(playerName);
+                }
+            });
+        });
+    }
 
     const epochDurSec = document.getElementById('epoch-duration');
     if (epochDurSec) {
@@ -221,6 +260,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     loadRewardPackages();
+    bindLeaderboardPlayers();
+
+    const validateRecipientsForm = document.getElementById('validate-recipients-form');
+    if (validateRecipientsForm) {
+        validateRecipientsForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const button = form.querySelector('button[type="submit"]');
+            const originalText = button ? button.textContent : 'Validate Recipients';
+
+            try {
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = 'Validating...';
+                }
+                if (typeof startLoader === 'function') startLoader();
+
+                const formData = new FormData(form);
+                const response = await fetch(form.dataset.action, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                let data = {};
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    console.error('Failed to parse JSON response:', e);
+                    sendFlashMessage('Server error during recipient validation.', 'error');
+                    return;
+                }
+
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    console.log(data);
+                    sendFlashMessage(data.message || 'Failed to validate recipients.', 'error');
+                }
+            } catch (error) {
+                console.error('Unexpected error validating recipients:', error);
+                sendFlashMessage('Unexpected error validating recipients.', 'error');
+            } finally {
+                if (typeof stopLoader === 'function') stopLoader();
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }
+        });
+    }
 
     const deleteModal = document.getElementById('delete-modal');
     if (deleteModal) {

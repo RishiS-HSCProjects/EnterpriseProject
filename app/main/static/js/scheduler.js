@@ -2,6 +2,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('add-modal');
     if (!modal) return;
 
+    document.querySelectorAll('.tournament-row[data-tournament-url]').forEach((row) => {
+        const url = row.dataset.tournamentUrl;
+        if (!url) return;
+
+        row.setAttribute('role', 'link');
+        row.setAttribute('tabindex', '0');
+
+        row.addEventListener('click', (event) => {
+            if (event.target.closest('a')) return;
+            window.location.href = url;
+        });
+
+        row.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                window.location.href = url;
+            }
+        });
+    });
+
     setupFormModal({
         modalId: 'add-modal',
         openButtonSelector: '.create-tournament-btn',

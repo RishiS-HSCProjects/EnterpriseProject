@@ -213,8 +213,13 @@
 {% macro tournament_item(tournaments, status) %}
 <div class="tournament-list">
     {% for t in tournaments %}
-    <div class="tournament-row status-{{ status }}" onclick="window.location='{{ url_for('main.tournament_editor', tournament_id=t.id) }}'">
-        <a class="tournament-row-left" href="{{ url_for('main.tournament_editor', tournament_id=t.id) }}">
+    {% set tournament_url = url_for('main.tournament_editor', tournament_id=t.id) if t.id is defined and t.id else None %}
+    <div class="tournament-row status-{{ status }}" {% if tournament_url %}data-tournament-url="{{ tournament_url }}"{% endif %}>
+        {% if tournament_url %}
+        <a class="tournament-row-left" href="{{ tournament_url }}">
+        {% else %}
+        <div class="tournament-row-left">
+        {% endif %}
             <div class="tournament-name">{{ t.name }}</div>
 
             <div class="tournament-dates">
@@ -222,7 +227,11 @@
                 <span class="separator">→</span>
                 <span class="dt" data-unix="{{ t.end_unix }}">{{ t.end_datetime.strftime('%d %B %H:%M') }}</span>
             </div>
+        {% if tournament_url %}
         </a>
+        {% else %}
+        </div>
+        {% endif %}
 
         <div class="tournament-row-right">
             <div>{{ t.round_count }} rounds</div>

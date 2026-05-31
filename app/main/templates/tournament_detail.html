@@ -20,7 +20,7 @@
 
 {% block scripts %}
     <script>
-        window.__isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
+        window.__isAuthenticated = {{ current_user.is_authenticated|tojson }};
     </script>
     <script src="{{ url_for('main.static', filename='js/time-utils.js') }}"></script>
     <script src="{{ url_for('main.static', filename='js/tournament-detail.js') }}"></script>
@@ -210,7 +210,7 @@
                         <input id="delete-password" name="confirm_password" type="password" class="field-input" placeholder="Your password" style="width:100%; margin-bottom:12px;" required autocomplete="current-password" />
                         <div style="text-align:right;">
                             <button type="button" class="auth-button" data-close-modal>Cancel</button>
-                            <button type="submit" class="auth-button auth-button-danger" onclick="return confirm('Are you sure you want to delete the tournament "{{ tournament.name }}"? This cannot be undone.');">Delete</button>
+                            <button type="submit" class="auth-button auth-button-danger" onclick="return confirm({{ ('Are you sure you want to delete the tournament "%s"? This cannot be undone.' % tournament.name)|tojson }});">Delete</button>
                         </div>
                     </form>
                 </div>
@@ -244,7 +244,7 @@
                     {% if entries|length > 0 %}
                         <ol class="leaderboard-list">
                             {% for p in entries %}
-                                <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }}</li>
+                                <li data-player="{{ p.player|e }}">{{ p.player }}: {{ p.score }}</li>
                             {% else %}
                                 <li>No leaderboard data available.</li>
                             {% endfor %}
@@ -280,7 +280,7 @@
                             {% if leaderboard_entries|length > 0 %}
                             <ol class="leaderboard-list">
                                 {% for p in leaderboard_entries %}
-                                    <li onclick="openPortal('{{ p.player }}')">{{ p.player }}: {{ p.score }} kills</li>
+                                    <li data-player="{{ p.player|e }}">{{ p.player }}: {{ p.score }} kills</li>
                                 {% else %}
                                     <div class="no-results">
                                         <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
@@ -302,33 +302,23 @@
                 <hr>
 
                 <h3 style="color: #ff8c00;">Disqualified Players</h3>
-                <div style="background: rgba(255, 140, 0, 0.05); padding: 16px; border-radius: 4px;">
-                    <ul style="list-style: none; padding: 0; margin: 0;">
+                <div id="disqualified-players" data-disqualified='{{ all_disqualified_players|tojson }}'>
+                    <ul class="leaderboard-list">
                         {% for player_name, disq_rounds in all_disqualified_players.items() %}
-                            <li style="margin-bottom: 16px; padding: 12px; background: rgba(255, 140, 0, 0.08); border-left: 3px solid #ff8c00; border-radius: 2px;">
+                            <li data-player="{{ player_name|e }}" title="Open {{ player_name }} on the Portal">
                                 <strong>{{ player_name }}</strong>
-                                {% for round_entry in disq_rounds %}
-                                    <br>
-                                    <small style="color: #bbb;">Round {{ round_entry.round }}:</small>
-                                    {% for punishment in round_entry.punishments %}
-                                        <br>
-                                        <span style="font-size: 0.9em;">
-                                            <strong>{{ punishment.type }}</strong>: Issued {{ punishment.issued_date }} — Expires {{ punishment.end_date }}
-                                        </span>
-                                        <br>
-                                        <small style="color: #999;">Reason: {{ punishment.reason }}</small>
-                                    {% endfor %}
-                                {% endfor %}
+                                (Reason: {{ disq_rounds[0].punishments[0].reason if disq_rounds[0].punishments|length > 0 else 'N/A' }})
                             </li>
                         {% endfor %}
                     </ul>
                 </div>
                 {% endif %}
 
-                {% if current_user.is_authenticated and current_user.is_manager() and tournament.is_expired %}
+                {% if current_user.is_authenticated and current_user.is_manager() and tournament.is_expired and cache_stats_locked %}
                 <hr>
                 <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
                     <h3 class="reward-packages-heading">Stats Packaging</h3>
+                    {% if tournament.recipients_validated %}
                     <p class="reward-packages-intro">Choose a package type to preview archived winners.</p>
                     <div id="reward-packages-controls" class="reward-packages-controls">
                         <div class="reward-package-control-group">
@@ -342,6 +332,13 @@
                     </div>
                     <div id="reward-packages-status" class="reward-packages-status"></div>
                     <ul id="reward-packages-list" class="reward-packages-list"></ul>
+                    {% else %}
+                    <form id="validate-recipients-form" method="POST" data-action="{{ url_for('main.tournament_validate_recipients', tournament_id=tournament.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value() }}">
+                        <p class="reward-packages-intro">Before you use reward packages, we need to validate the recipient list. This ensures that all winners have valid player names and are eligible for receive their rewards. This process may take a few minutes.</p>
+                        <button type="submit" class="auth-button auth-button-primary">Validate Recipients</button>
+                    </form>
+                    {% endif %}
                 </div>
                 {% endif %}
             {% endif %}

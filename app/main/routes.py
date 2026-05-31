@@ -1,7 +1,13 @@
 from dataclasses import dataclass, field
 from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify, abort
 from flask_login import current_user, login_required
-from app.models.tournament import Tournament, TournamentArchiveException, TournamentPrizes, RewardPackageTypes
+from app.models.tournament import (
+    Tournament,
+    TournamentArchiveException,
+    TournamentPrizes,
+    RewardPackageTypes,
+    format_punishments_for_ui,
+)
 from app.utils.utils import flash, flash_all_form_errors, restore_form_state, save_form_state
 from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_lines, format_prize_lines, send as discord_send
 from time import time
@@ -321,76 +327,23 @@ def tournament_editor(tournament_id: int):
     start_dt = datetime.fromtimestamp(tourney.start_unix, UTC)
     end_dt = datetime.fromtimestamp(tourney.end_unix, UTC)
 
-    def _format_disqualified_punishments(punishments, tournament_start: int) -> list[dict[str, str]]:
-        from app.models.tournament import PunishmentType
+    # UI formatting for punishments is centralized in `format_punishments_for_ui`.
 
-        formatted_punishments = []
-        for punishment in punishments:
-            try:
-                punishment_type = PunishmentType[punishment.get('type').upper()]
-                reason = punishment_type.past_tense
-            except KeyError:
-                current_app.logger.error(
-                    "Unknown punishment type provided: %s\nDataset: %s",
-                    punishment.get('type', 'UNKNOWN'),
-                    punishment,
-                )
-                punishment_type = PunishmentType.BAN
-                reason = 'unknown punishment'
+    all_disqualified_players = {}
+    validation_data = tourney.archives.get('validation') if isinstance(tourney.archives, dict) else None
+    if isinstance(validation_data, dict):
+        for disq_player_data in validation_data.get('disqualifiedPlayers') or []:
+            player_name = disq_player_data.get('player', 'Unknown')
+            punishments = disq_player_data.get('punishments', [])
+            formatted_punishments = format_punishments_for_ui(punishments, tourney.start_unix)
 
-            issued_at = punishment.get('issued_at')
-            end_at = punishment.get('end_at')
-            lookback = punishment_type.lookback_seconds
-            lookback_days = lookback // (24 * 60 * 60)
+            if player_name not in all_disqualified_players:
+                all_disqualified_players[player_name] = []
 
-            if not end_at or not tournament_start:
-                current_app.logger.error(
-                    "Timestamps not returned for punishment %s: %s",
-                    punishment.get('id', 'UNKNOWN'),
-                    punishment,
-                )
-                continue
-            if end_at >= tournament_start:
-                reason = f"{reason} during tournament"
-            elif end_at >= tournament_start - lookback:
-                reason = f"{reason} before tournament (within {lookback_days}d lookback)"
-            else:
-                reason = f"{reason} before tournament"
-
-            formatted_punishments.append({
-                'type': punishment_type.name,
-                'issued_date': datetime.fromtimestamp(issued_at, UTC).strftime('%Y-%m-%d') if issued_at else 'Unknown',
-                'end_date': datetime.fromtimestamp(end_at, UTC).strftime('%Y-%m-%d') if end_at else 'Unknown',
-                'reason': reason,
+            all_disqualified_players[player_name].append({
+                'round': disq_player_data.get('round', 'Validation'),
+                'punishments': formatted_punishments,
             })
-
-        return formatted_punishments
-
-    all_disqualified_players = {}  # {player_name: [list of {round, punishments}]}
-    if tourney.archives and isinstance(tourney.archives.get('rounds'), dict):
-        for round_key, round_archive in tourney.archives['rounds'].items():
-            if not isinstance(round_archive, dict):
-                continue
-            if 'disqualifiedPlayers' not in round_archive:
-                continue
-
-            try:
-                round_number = int(round_key)
-            except (TypeError, ValueError):
-                continue
-
-            for disq_player_data in round_archive['disqualifiedPlayers']:
-                player_name = disq_player_data.get('player', 'Unknown')
-                punishments = disq_player_data.get('punishments', [])
-                formatted_punishments = _format_disqualified_punishments(punishments, tourney.start_unix)
-
-                if player_name not in all_disqualified_players:
-                    all_disqualified_players[player_name] = []
-
-                all_disqualified_players[player_name].append({
-                    'round': round_number,
-                    'punishments': formatted_punishments,
-                })
 
     # Build round leaderboards
     round_leaderboards = []
@@ -444,6 +397,185 @@ def tournament_package_stats(tournament_id: int):
     current_app.logger.info(request.method)
     packages = tourney.get_reward_packages()
     return jsonify({'success': True, 'packages': packages})
+
+@main_bp.route('/scheduler/<int:tournament_id>/validate_recipients', methods=['POST'])
+def tournament_validate_recipients(tournament_id: int):
+    if not (current_user and current_user.is_manager()):
+        return jsonify({'success': False, 'message': 'Access denied. Managers only.'}), 403
+
+    tourney = Tournament.query.get_or_404(tournament_id)
+    from app.models.user import User
+    from app import db
+
+    def _normalize_punishment(punishment: dict):
+        punishment_type = str(punishment.get('type') or '').upper()
+        if punishment_type not in {'BAN', 'MUTE'}:
+            return None
+
+        issued_at = punishment.get('issuedAt')
+        if not isinstance(issued_at, int):
+            return None
+
+        valid_until = punishment.get('validUntil')
+        if valid_until is not None and not isinstance(valid_until, int):
+            valid_until = None
+
+        player = punishment.get('player')
+        if not isinstance(player, str) or not player:
+            return None
+
+        return {
+            'id': punishment.get('id'),
+            'type': punishment_type,
+            'issued_at': issued_at,
+            'end_at': valid_until,
+            'player': player,
+        }
+
+    def _is_disqualifying(punishment: dict) -> bool:
+        end_at = punishment.get('end_at')
+        if end_at is None:
+            return True
+
+        lookback_seconds = 30 * 24 * 60 * 60 if punishment.get('type') == 'BAN' else 7 * 24 * 60 * 60
+        cutoff = tourney.start_unix - lookback_seconds
+        return end_at >= tourney.start_unix or end_at >= cutoff
+
+    def _player_disqualification_record(player_name: str) -> dict | None:
+        if player_name in seen_players:
+            return disqualification_cache.get(player_name)
+
+        seen_players.add(player_name)
+        try:
+            data = User.get_player_data(player_name)
+        except Exception:
+            disqualification_cache[player_name] = None
+            return None
+
+        raw_punishments = []
+        if isinstance(data, dict):
+            raw_punishments = data.get('punishmentsNew') or data.get('punishments') or []
+
+        latest_by_type: dict[str, dict] = {}
+        for raw in raw_punishments:
+            if not isinstance(raw, dict):
+                continue
+            normalized = _normalize_punishment(raw)
+            if not normalized:
+                continue
+
+            current = latest_by_type.get(normalized['type'])
+            if current is None or normalized['issued_at'] >= current['issued_at']:
+                latest_by_type[normalized['type']] = normalized
+
+        disq_punishments = [p for p in latest_by_type.values() if _is_disqualifying(p)]
+        if not disq_punishments:
+            disqualification_cache[player_name] = None
+            return None
+
+        record = {
+            'player': player_name,
+            'punishments': [
+                {
+                    'id': p.get('id'),
+                    'issued_at': p.get('issued_at'),
+                    'end_at': p.get('end_at'),
+                    'type': p.get('type'),
+                }
+                for p in disq_punishments
+            ],
+        }
+
+        disqualification_cache[player_name] = record
+        return record
+
+    seen_players: set[str] = set()
+    disqualification_cache: dict[str, dict | None] = {}
+
+    def _select_top_qualified(entries, required: int = 3):
+        qualified = []
+        disqualified_players = []
+
+        for entry in entries:
+            if len(qualified) >= required:
+                break
+
+            player = entry.player if hasattr(entry, 'player') else None
+            if not isinstance(player, str) or not player:
+                continue
+
+            record = _player_disqualification_record(player)
+            if record:
+                disqualified_players.append(record)
+                continue
+
+            qualified.append(entry)
+
+        return qualified, disqualified_players
+
+    disqualified_records: dict[str, dict] = {}
+
+    round_firsts = []
+    round_seconds = []
+    round_thirds = []
+
+    for r in range(1, tourney.round_count + 1):
+        round_leaderboard = tourney.get_leaderboard(round_num=r)
+        entries = round_leaderboard.entries if hasattr(round_leaderboard, 'entries') else round_leaderboard.get_top(100)
+        eligible, round_disqualified = _select_top_qualified(entries, required=3)
+        for record in round_disqualified:
+            disqualified_records.setdefault(record['player'], record)
+
+        round_firsts.append({'round': r, 'player': eligible[0].player if len(eligible) > 0 else None})
+        round_seconds.append({'round': r, 'player': eligible[1].player if len(eligible) > 1 else None})
+        round_thirds.append({'round': r, 'player': eligible[2].player if len(eligible) > 2 else None})
+
+    overall_entries = tourney.get_leaderboard(round_num=None).get_entries()
+    overall_eligible, overall_disqualified = _select_top_qualified(overall_entries, required=3)
+    for record in overall_disqualified:
+        disqualified_records.setdefault(record['player'], record)
+
+    global_first = overall_eligible[0].player if len(overall_eligible) > 0 else None
+    global_second = overall_eligible[1].player if len(overall_eligible) > 1 else None
+    global_third = overall_eligible[2].player if len(overall_eligible) > 2 else None
+
+    def resolve_entry(player):
+        if not player:
+            return None
+        xuid = tourney._resolve_player_xuid(player)
+        return {'player': player, 'xuid': xuid}
+
+    recipients = {
+        'round_firsts': [{ 'round': e['round'], **(resolve_entry(e['player']) or {'player': None, 'xuid': None}) } for e in round_firsts],
+        'round_seconds': [{ 'round': e['round'], **(resolve_entry(e['player']) or {'player': None, 'xuid': None}) } for e in round_seconds],
+        'round_thirds': [{ 'round': e['round'], **(resolve_entry(e['player']) or {'player': None, 'xuid': None}) } for e in round_thirds],
+        'global': {
+            'first': resolve_entry(global_first),
+            'second': resolve_entry(global_second),
+            'third': resolve_entry(global_third),
+        },
+    }
+
+    validation_payload = {
+        'disqualifiedPlayers': list(disqualified_records.values()),
+        'recipients': recipients,
+    }
+
+    from app import db
+    archives = tourney.archives or {}
+    if not isinstance(archives, dict):
+        archives = {}
+    archives['validation'] = validation_payload
+    tourney.recipients_validated = True
+    tourney.archives = archives
+    try:
+        db.session.add(tourney)
+        db.session.commit()
+    except Exception as exc:
+        current_app.logger.exception('Failed to persist validated recipients: %s', exc)
+        return jsonify({'success': False, 'message': 'Failed to persist recipients.'}), 500
+
+    return jsonify({'success': True, 'message': 'Recipients validated and saved.', 'recipients': recipients, 'disqualifiedPlayers': validation_payload['disqualifiedPlayers']})
 
 def _relative_logic(ts, now_ts):
     diff = ts - now_ts
