@@ -23,6 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
+/**
+ * - Sends verification code to Discord
+ * - Opens verification code input form
+*/
 function handleVerificationSubmit() {
     startLoader();
 
@@ -59,11 +63,10 @@ function handleVerificationSubmit() {
         // Show modal (use central helper openModal if available)
         const modal = document.getElementById("pin-modal");
         const pinInput = modal ? modal.querySelector('input[name="pin"]') : null;
-        if (typeof openModal === 'function' && modal) openModal(modal, pinInput);
+        if (modal) openModal(modal, pinInput);
         else if (modal) modal.removeAttribute("hidden");
         return;
-    })
-        .catch(error => {
+    }).catch(error => {
         console.error("Error:", error);
         stopLoader();
     });
@@ -92,9 +95,8 @@ function handlePinSubmit() {
         if (data.status === "error") {
             if (data.message) console.error("Verification error:", data.message);
 
-            if (response.status === 409) window.location.href = "/login";
+            if (response.status === 409) window.location.href = "/login"; // Redirect to login page on 409 conflict err (acc already exists)
             else window.location.href = "/register";
-
             return;
         }
 

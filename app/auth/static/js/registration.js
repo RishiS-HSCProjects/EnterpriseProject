@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Automatically put focus on the first visible/interactable element in the registration forms
     const firstInput = document.querySelector('input[type="text"]');
     if (firstInput) {
         firstInput.focus();

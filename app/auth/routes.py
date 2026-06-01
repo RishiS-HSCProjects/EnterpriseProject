@@ -22,27 +22,30 @@ def login():
         try:
             user: User = User.query.filter_by(username=form.username.data).first() # type: ignore
 
+            # Found user during login? Password correct? Still staff?
             if user and user.check_password(form.password.data) and (user.validate()[0] if current_app.config.get('VERIFY_STAFF_STATUS') else True):
                 user.login()
                 flash('Login successful.', 'success')
                 return redirect(url_for('main.dashboard'))
             else:
+                # Any issues? Flash errors and refresh
                 add_username_error("Invalid username or password.")
                 flash_all_form_errors(form)
                 save_form_state(form, 'login_form')
                 return redirect(url_for('auth.login'))
         except UserNotWhitelisted as exc:
+            # Handle specific issue (not-whitelisted error)
             add_username_error(str(exc))
             flash_all_form_errors(form)
             save_form_state(form, 'login_form')
             return redirect(url_for('auth.login'))
         except Exception as exc:
+            # Handle general cases
             current_app.logger.error(f"Unexpected error during user creation: {exc}")
             flash("An unexpected error occurred. Please try again.")
             save_form_state(form, 'login_form')
             return redirect(url_for('auth.login'))
-    elif form.errors:
-        flash_all_form_errors(form)
+    elif form.errors: flash_all_form_errors(form) # Any other issues? Flash errors
 
     return render_template('login.html', form=form)
 

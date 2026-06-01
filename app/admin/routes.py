@@ -39,7 +39,7 @@ def panel():
     return render_template(
         'admin.html',
         add_form=WhitelistAddForm(),
-        empty_form=EmptyForm(),
+        empty_form=EmptyForm(), # Empty forms used for CSRF tokens
         whitelist_entries=visible_entries,
     )
 
@@ -57,13 +57,16 @@ def whitelist_add():
         whitelist_entry = Whitelist.whitelist_user(username)
         db.session.add(whitelist_entry)
         db.session.commit()
-        flash(f'{username} was added to the whitelist.', 'success')
+        flash(f'{username} added to the whitelist.', 'success')
     except (UserAlreadyWhitelisted, PermissionDenied, UserNotFound) as exc:
+        # Rollback database session in the case of an error
         db.session.rollback()
-        flash(str(exc), 'error')
+        flash(str(exc), 'error') # Safe to return str(exc) since these are custom errors
     except Exception as exc:
+        # Rollback database session in the case of an error
         db.session.rollback()
         current_app.logger.error(f'Unexpected whitelist add error: {exc}')
+        # Return generic error
         flash('An unexpected error occurred while adding this user.', 'error')
 
     return redirect(url_for('admin.panel'))
@@ -71,12 +74,12 @@ def whitelist_add():
 @admin_bp.route('/whitelist/remove/<int:entry_id>', methods=['POST'])
 @admin_required
 def whitelist_remove(entry_id: int):
-    form = EmptyForm()
+    form = EmptyForm() # Empty form for session security
     if not form.validate_on_submit():
         flash('Invalid request. Please refresh the page and try again.', 'error')
         return redirect(url_for('admin.panel'))
 
-    whitelist_entry = Whitelist.query.get_or_404(entry_id)
+    whitelist_entry = Whitelist.query.get_or_404(entry_id) # Should never be 404
     username = whitelist_entry.username
 
     if whitelist_entry.xuid == current_user.xuid:

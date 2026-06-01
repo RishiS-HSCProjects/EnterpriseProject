@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const whitelistForm = document.getElementById('whitelist-add-form');
     if (whitelistForm) {
         whitelistForm.addEventListener('submit', (event) => {
+            // Add submit listener for when the add button is clicked
+            // Client-side verification done here for efficiency
             const usernameInput = whitelistForm.querySelector('input[name="username"]');
             const username = (usernameInput.value || '').trim().toLowerCase();
 
@@ -20,11 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            startLoader();
+            startLoader(); // Start loading animation
+            // Form automatically redirects to the whitelist add route
         });
     }
 });
 
+/**
+ * Update aggregate stats (total, unregistered) based on table values.
+ */
 function updateAggregates() {
     const whitelistTable = document.querySelector('#table-whitelist table tbody');
     if (!whitelistTable) return;
@@ -32,6 +38,8 @@ function updateAggregates() {
     const rows = whitelistTable.querySelectorAll('tr');
     let total = 0, unregistered = 0;
 
+    // Go through each row and compute registeration information client-side
+    // Ignores filters for name/xuid and registration status
     rows.forEach(r => {
         const cells = r.querySelectorAll('td');
         if (cells.length < 3) return;
@@ -44,6 +52,7 @@ function updateAggregates() {
         }
     });
 
+    // Set vals
     const aggTotal = document.getElementById('agg-total');
     const aggUnregistered = document.getElementById('agg-unregistered');
     if (aggTotal) aggTotal.textContent = `Total: ${total}`;
@@ -77,7 +86,7 @@ function applyWhitelistFilters() {
         r.style.display = visible ? '' : 'none';
     });
 
-    updateAggregates();
+    updateAggregates(); // Update aggregates on filter application
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -90,13 +99,18 @@ document.addEventListener('DOMContentLoaded', () => {
     applyWhitelistFilters();
 });
 
+/**
+ * Client-side table updating on role update event
+ */
 function updateRole(entryId, selectElement) {
     const previousRole = selectElement.dataset.previous;
     const newRole = selectElement.value;
 
+    // Disable to avoid accidental repeat requests
     selectElement.disabled = true;
     startLoader();
 
+    // Ask the server to change the role
     fetch(`/admin/update_role/${entryId}`, {
         method: 'POST',
         headers: {

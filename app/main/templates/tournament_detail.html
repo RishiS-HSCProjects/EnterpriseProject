@@ -63,7 +63,7 @@
                 <div class="form-group">
                     {{ form.round_count.label(class="field-label") }}
                     {{ form.round_count(class="field-input", id="round-count-input") }}
-                    <p class="time-info" id="epoch-duration" title="Use this value in the Portal" data-value="{{ epoch_details.round_secs }}">
+                    <p class="time-info" id="epoch-duration" {% if current_user.is_authenticated %}title="Use this value in the Portal" {% endif %}>
                         Round Duration: {{ epoch_details.round_secs }} seconds
                     </p>
                 </div>

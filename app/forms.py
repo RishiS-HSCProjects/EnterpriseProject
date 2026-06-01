@@ -32,8 +32,8 @@ class VerificationPinForm(FlaskForm):
 class AddTournamentForm(FlaskForm):
     """Form for adding a new tournament."""
     name = StringField('Tournament Name', validators=[DataRequired(), Length(min=3, max=100)])
-    start_unix = IntegerField('Start (Unix epoch seconds)', validators=[DataRequired()])
-    end_unix = IntegerField('End (Unix epoch seconds)', validators=[DataRequired()])
+    start_unix = IntegerField('Start', validators=[DataRequired()])
+    end_unix = IntegerField('End', validators=[DataRequired()])
     round_count = IntegerField('Number of Rounds', validators=[DataRequired(), NumberRange(min=1)])
     discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=2000)])
     round_first_prize = StringField('Round First Place Prize', validators=[DataRequired(), Length(max=100)])

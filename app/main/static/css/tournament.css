@@ -91,9 +91,6 @@ select.field-input:focus {
     background: rgba(255, 140, 0, 0.05);
     border-bottom: 1px solid var(--primary);
     border-radius: 3px;
-}
-
-#epoch-duration {
     cursor: pointer;
 }
 

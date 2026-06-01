@@ -59,6 +59,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const epochStartTime = document.getElementById("start-info");
+    if (epochStartTime) {
+        epochStartTime.addEventListener('click', async () => {
+            if (copyClipboard(epochStartTime.dataset.value)) {
+                sendFlashMessage('Tournament start time copied to clipboard!', 'success');
+            } else {
+                sendFlashMessage('Something went wrong when trying to copy start time to clipboard.', 'error');
+            }
+        });
+    }
+
+    const epochEndTime = document.getElementById("end-info");
+    if (epochEndTime) {
+        epochEndTime.addEventListener('click', async () => {
+            if (copyClipboard(epochEndTime.dataset.value)) {
+                sendFlashMessage('Tournament end time copied to clipboard!', 'success');
+            } else {
+                sendFlashMessage('Something went wrong when trying to copy end time to clipboard.', 'error');
+            }
+        });
+    }
+
     const epochDurSec = document.getElementById('epoch-duration');
     if (epochDurSec) {
         epochDurSec.addEventListener('click', async () => {
@@ -381,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${value}</code>`;
                 infoEl.title = `GMT: ${utc} | ${relative}`;
                 infoEl.style.display = 'block';
+                infoEl.dataset.value = value;
             }
         };
 
