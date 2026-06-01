@@ -19,6 +19,29 @@ document.addEventListener('DOMContentLoaded', () => {
     updateFlashContainerVisibility(container);
 
     messages.forEach((msg, index) => initFlashMessage(msg, index, container));
+
+    const syncFlashTimers = () => {
+        const shouldPause = document.hidden || !document.hasFocus();
+        const activeMessages = Array.from(
+            container.querySelectorAll('.flash-message')
+        );
+
+        activeMessages.forEach((msg) => {
+            if (msg.fadeOutStarted) {
+                return;
+            }
+
+            if (shouldPause) {
+                pauseTimer(msg, 'focus');
+            } else {
+                resumeTimer(msg, 'focus');
+            }
+        });
+    };
+
+    window.addEventListener('blur', syncFlashTimers);
+    window.addEventListener('focus', syncFlashTimers);
+    document.addEventListener('visibilitychange', syncFlashTimers);
 });
 
 /**
@@ -46,24 +69,31 @@ function initFlashMessage(msg, index = 0, container = document.getElementById('f
             msg.remaining = FLASH_DURATION;
             msg.lastTick = Date.now();
             msg.fadeOutStarted = false;
-            msg.timer = requestAnimationFrame(() => tick(msg));
+            msg.pauseReasons = msg.pauseReasons || new Set();
+
+            if (document.hidden || !document.hasFocus()) {
+                pauseTimer(msg, 'focus');
+            } else {
+                msg.timer = requestAnimationFrame(() => tick(msg));
+            }
 
             // Hover to pause timer
             msg.addEventListener('mouseenter', () => {
                 if (msg.fadeOutStarted) return;
-                pauseTimer(msg);
+                pauseTimer(msg, 'hover');
             });
 
             // Hover to resume timer (with bonus time)
             msg.addEventListener('mouseleave', () => {
                 if (msg.fadeOutStarted) return;
                 msg.remaining = Math.min(msg.remaining + 2000, FLASH_DURATION);
-                resumeTimer(msg);
+                resumeTimer(msg, 'hover');
             });
 
             // Click to dismiss immediately
             msg.addEventListener('click', () => {
-                pauseTimer(msg);
+                pauseTimer(msg, 'hover');
+                pauseTimer(msg, 'focus');
                 fadeOut(msg);
             });
         }, 100);
@@ -96,8 +126,15 @@ function tick(msg) {
  * Pause the auto-dismiss timer for a flash message.
  * 
  * @param {HTMLElement} msg - The flash message element.
+ * @param {string} [reason='manual'] - Why the timer is being paused.
  */
-function pauseTimer(msg) {
+function pauseTimer(msg, reason = 'manual') {
+    if (!msg.pauseReasons) {
+        msg.pauseReasons = new Set();
+    }
+
+    msg.pauseReasons.add(reason);
+
     if (msg.timer) {
         cancelAnimationFrame(msg.timer);
         msg.timer = null;
@@ -108,9 +145,14 @@ function pauseTimer(msg) {
  * Resume the auto-dismiss timer for a flash message.
  * 
  * @param {HTMLElement} msg - The flash message element.
+ * @param {string} [reason='manual'] - Why the timer is being resumed.
  */
-function resumeTimer(msg) {
-    if (!msg.timer) {
+function resumeTimer(msg, reason = 'manual') {
+    if (msg.pauseReasons) {
+        msg.pauseReasons.delete(reason);
+    }
+
+    if (!msg.timer && (!msg.pauseReasons || msg.pauseReasons.size === 0)) {
         msg.lastTick = Date.now();
         msg.timer = requestAnimationFrame(() => tick(msg));
     }

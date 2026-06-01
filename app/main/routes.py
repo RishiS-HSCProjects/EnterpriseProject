@@ -440,16 +440,29 @@ def tournament_validate_recipients(tournament_id: int):
         cutoff = tourney.start_unix - lookback_seconds
         return end_at >= tourney.start_unix or end_at >= cutoff
 
-    def _player_disqualification_record(player_name: str) -> dict | None:
+    def _player_data(player_name: str) -> dict | None:
         if player_name in seen_players:
-            return disqualification_cache.get(player_name)
+            return player_data_cache.get(player_name)
 
         seen_players.add(player_name)
         try:
             data = User.get_player_data(player_name)
         except Exception:
-            disqualification_cache[player_name] = None
+            player_data_cache[player_name] = None
             return None
+
+        if not isinstance(data, dict):
+            player_data_cache[player_name] = None
+            return None
+
+        player_data_cache[player_name] = data
+        return data
+
+    def _player_disqualification_record(player_name: str) -> dict | None:
+        if player_name in seen_players:
+            return disqualification_cache.get(player_name)
+
+        data = _player_data(player_name)
 
         raw_punishments = []
         if isinstance(data, dict):
@@ -489,6 +502,7 @@ def tournament_validate_recipients(tournament_id: int):
         return record
 
     seen_players: set[str] = set()
+    player_data_cache: dict[str, dict | None] = {}
     disqualification_cache: dict[str, dict | None] = {}
 
     def _select_top_qualified(entries, required: int = 3):
@@ -541,8 +555,9 @@ def tournament_validate_recipients(tournament_id: int):
     def resolve_entry(player):
         if not player:
             return None
+        player_data = _player_data(player)
         xuid = tourney._resolve_player_xuid(player)
-        return {'player': player, 'xuid': xuid}
+        return {'player': player, 'xuid': xuid, 'avatar': (player_data or {}).get('avatar', url_for('main.static', filename='img/head.png'))}
 
     recipients = {
         'round_firsts': [{ 'round': e['round'], **(resolve_entry(e['player']) or {'player': None, 'xuid': None}) } for e in round_firsts],
@@ -558,6 +573,11 @@ def tournament_validate_recipients(tournament_id: int):
     validation_payload = {
         'disqualifiedPlayers': list(disqualified_records.values()),
         'recipients': recipients,
+        'playerData': {
+            player: {'avatar': data.get('avatar')}
+            for player, data in player_data_cache.items()
+            if isinstance(data, dict)
+        },
     }
 
     from app import db
