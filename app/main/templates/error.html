@@ -53,6 +53,23 @@
 
 {% block page_content %}
     <p class="error-message">{{ error }}</p>
+    {% if reload_page %}
+    <p class="error-message" id="reload-status">Attempting to connect to the server...</p>
+    <script>
+        (() => {
+            const key = 'main:error-reload-attempted';
+            const status = document.getElementById('reload-status');
+
+            if (sessionStorage.getItem(key) === '1') {
+                if (status) status.textContent = "Reload already attempted. Use the button below if you want to try again";
+                return;
+            }
+
+            sessionStorage.setItem(key, '1');
+            window.setTimeout(() => window.location.reload(), 1500); // 1.5 second delay to allow the server time to cold-start if needed
+        })();
+    </script>
+    {% endif %}
     <div id="actions">
         <a href="javascript:history.back()" class="btn">Go back!</a>
         <a href="{{ url_for('main.dashboard') }}" class="btn">Go to Dashboard</a>

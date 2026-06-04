@@ -41,12 +41,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const targetUnix = Number(card.dataset.kpiTargetUnix);
         if (!Number.isFinite(targetUnix)) return; // Invalid or missing target timestamp
 
+        const field = card.dataset.kpiCountdownField === 'detail' ? 'detail' : 'value';
+        const targetEl = card.querySelector(field === 'detail' ? '.kpi-bottom' : '.kpi-value');
+        if (!targetEl) return;
+
+        const titleEl = card.querySelector('.kpi-top');
         const valueEl = card.querySelector('.kpi-value');
-        if (!valueEl) return;
+        const detailEl = card.querySelector('.kpi-bottom');
 
         const secondsRemaining = Math.max(0, targetUnix - Math.floor(Date.now() / 1000));
-        // Update the card's value element with the formatted countdown string
-        valueEl.textContent = formatCountdown(secondsRemaining);
+        const countdownText = `${formatCountdown(secondsRemaining)} remaining`;
+        targetEl.textContent = countdownText;
+
+        if (titleEl && valueEl && detailEl) {
+            card.setAttribute('aria-label', `${titleEl.textContent}. ${valueEl.textContent}. ${detailEl.textContent}`);
+        }
     };
 
     const tick = () => {

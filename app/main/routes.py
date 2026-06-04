@@ -13,6 +13,7 @@ from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_
 from time import time
 from datetime import datetime, UTC
 from werkzeug.exceptions import HTTPException
+from sqlalchemy.exc import OperationalError
 
 main_bp = Blueprint("main", __name__, template_folder="templates", static_folder="static", static_url_path="/main/static")
 
@@ -50,6 +51,23 @@ def dashboard():
 
         return f"{hours}h {minutes}m"
 
+    def _format_countdown(seconds: float) -> str:
+        total_seconds = max(0, int(seconds))
+        if total_seconds < 60:
+            return f"{total_seconds}s"
+        if total_seconds < 3600:
+            minutes = total_seconds // 60
+            seconds_left = total_seconds % 60
+            return f"{minutes}m {seconds_left}s"
+        if total_seconds < 86400:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            return f"{hours}h" if not minutes else f"{hours}h {minutes}m"
+
+        days = total_seconds // 86400
+        hours = (total_seconds % 86400) // 3600
+        return f"{days}d" if not hours else f"{days}d {hours}h"
+
     now_ts = int(datetime.now(UTC).timestamp())
     tournaments = Tournament.query.order_by(Tournament.start_unix.asc()).all()
 
@@ -64,12 +82,16 @@ def dashboard():
             active_tournament.round_count,
             max(1, int((now_ts - active_tournament.start_unix) // active_tournament.round_duration) + 1),
         )
+        next_round_unix = min(
+            active_tournament.end_unix,
+            active_tournament.start_unix + (current_round * active_tournament.round_duration),
+        )
         kpis.append(KPI(
             title="Active Tournament",
             value=str(current_round),
             detail=f"of {active_tournament.round_count} rounds",
             hover_text=f"{active_tournament.name} is currently running.",
-            href=url_for('main.tournament_editor', tournament_id=active_tournament.id)
+            href=url_for('main.tournament_editor', tournament_id=active_tournament.id),
         ))
         kpis.append(KPI(
             title="Status",
@@ -81,8 +103,13 @@ def dashboard():
         kpis.append(KPI(
             title="Round Duration",
             value=_format_round_duration(active_tournament.round_duration),
-            detail=f"{str(max(1, int(round(active_tournament.round_duration))))} seconds per round",
-            hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds."
+            detail=f"{_format_countdown(next_round_unix - now_ts)} remaining",
+            hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds.",
+            attrs={
+                "data-kpi-kind": "countdown",
+                "data-kpi-target-unix": str(next_round_unix),
+                "data-kpi-countdown-field": "detail",
+            },
         ))
     elif next_tournament:
         kpis.append(KPI(
@@ -916,7 +943,10 @@ def handle_http_exception(e):
         current_app.logger.debug('HTTP error %s: %s', e.code, e)
 
     try:
-        return render_template('error.html', error=e.description, code=e.code), e.code
+        description = e.description
+        if e.code == 500:
+            description = 'An unexpected error occurred. Please refresh the page and try again, or go back using the button below.'
+        return render_template('error.html', error=description, code=e.code), e.code
     except Exception:
         current_app.logger.exception('Failed to render HTTP error page: %s', e)
         return f'Error {e.code}: {e.description}', e.code
@@ -927,8 +957,28 @@ def handle_exception(e):
     db.session.rollback()
     current_app.logger.exception('Unhandled exception: %s', e)
 
+    def _is_retryable_db_error(error: Exception) -> bool:
+        if not isinstance(error, OperationalError):
+            return False
+
+        message = str(error).lower()
+        retryable_phrases = (
+            'server closed the connection unexpectedly',
+            'connection refused',
+            'terminating connection',
+        )
+        return any(phrase in message for phrase in retryable_phrases)
+
+    reload_page = _is_retryable_db_error(e)
+
     try:
-        return render_template('error.html', error='An unexpected error occurred.', code=500), 500
+        error_message = (
+            'The database connection dropped. Reloading the page to try again.'
+            if reload_page else
+            'An unexpected error occurred.'
+        )
+
+        return render_template('error.html', error=error_message, code=500, reload_page=reload_page), 500
     except Exception:
         current_app.logger.exception('Failed to render error page after exception: %s', e)
         return 'Error 500: An unexpected error occurred.', 500
