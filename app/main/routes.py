@@ -28,13 +28,8 @@ def dashboard():
         href: str | None = None
         attrs: dict[str, str] = field(default_factory=dict)
 
-    def _format_days(value: int) -> str:
-        return "1" if value == 1 else str(value)
-
-    def _format_day_label(value: int) -> str:
-        return "day" if value == 1 else "days"
-
     def _format_round_duration(seconds: float) -> str:
+        """ Format round duration to h/m/s """
         total_seconds = max(0, int(round(seconds)))
         if total_seconds < 60:
             return f"{total_seconds} seconds"
@@ -52,6 +47,7 @@ def dashboard():
         return f"{hours}h {minutes}m"
 
     def _format_countdown(seconds: float) -> str:
+        """ Format countdown in to h/m/s """
         total_seconds = max(0, int(seconds))
         if total_seconds < 60:
             return f"{total_seconds}s"
@@ -71,9 +67,10 @@ def dashboard():
     now_ts = int(datetime.now(UTC).timestamp())
     tournaments = Tournament.query.order_by(Tournament.start_unix.asc()).all()
 
+    # Get first tournament where the condition is met. Iterate through until condition is met.
     active_tournament = next((t for t in tournaments if t.start_unix <= now_ts <= t.end_unix), None)
     next_tournament = next((t for t in tournaments if t.start_unix > now_ts), None)
-    last_tournament = next((t for t in reversed(tournaments) if t.end_unix < now_ts), None)
+    last_tournament = next((t for t in reversed(tournaments) if t.end_unix < now_ts), None) # Reverse for faster computation
 
     kpis: list[KPI] = []
 
@@ -141,8 +138,8 @@ def dashboard():
             days_ago = max(0, (now_ts - last_tournament.end_unix) // 86400)
             kpis.append(KPI(
                 title="Last Tournament",
-                value=_format_days(days_ago),
-                detail=f"{_format_day_label(days_ago)} ago",
+                value=str(days_ago),
+                detail=f"day{'s' * (days_ago != 1)} ago", # Handle plural case
                 href=url_for('main.tournament_editor', tournament_id=last_tournament.id),
                 hover_text=f"Last tournament: {last_tournament.name}"
             ))
@@ -196,7 +193,21 @@ def dashboard():
             hover_text="There is no completed tournament to summarize yet."
         ))
 
-    return render_template('dashboard.html', kpis=kpis)
+
+    # Get data for last tournament podium, if available
+    podium_players = []
+    if last_tournament:
+        last_lb = last_tournament.get_leaderboard(round_num=None).get_entries(limit=3)
+        # On validation, avatar is pulled from top victors. Dig into the validation registry for that value (instead of pulling it each time)
+        for player in last_tournament.validation_registry().get('recipients', {}).get('global', {}).values():
+            podium_players.append({
+                'xuid': player.get('xuid'),
+                'ign': player['player'],
+                'avatar': player.get('avatar') or url_for('main.static', filename='img/head.png'),
+                'value': next((entry.score for entry in last_lb if entry.player == player['player']), None)
+            })
+
+    return render_template('dashboard.html', kpis=kpis, last_tournament=last_tournament, podium_players=podium_players)
 
 @main_bp.route('/scheduler', methods=['GET', 'POST'])
 def scheduler(open_add_modal=False):
@@ -291,6 +302,8 @@ def tournament_editor(tournament_id: int):
     elif request.method == 'POST':
         save_form_state(form, form_id='tournament_editor')
 
+    # Only process changes if authenticated.
+    # This way, even if the js is intercepted, the db will not change unless the server says they are authenticated.
     if current_user.is_authenticated:
         form = restore_form_state(form)
 
@@ -383,6 +396,7 @@ def tournament_editor(tournament_id: int):
         round_leaderboards.append(round_data)
 
     def _banner_time(dt, ts):
+        """ Create string for banner time on the page. Uses local timezone. """
         local_dt = dt.astimezone()
         local_text = f"{local_dt.day} {local_dt.strftime('%B %Y at %H:%M')}"
         return f"{local_text} ({_relative_logic(ts, now_ts)})"
@@ -435,7 +449,7 @@ def tournament_validate_recipients(tournament_id: int):
 
     def _normalize_punishment(punishment: dict):
         punishment_type = str(punishment.get('type') or '').upper()
-        if punishment_type not in {'BAN', 'MUTE'}:
+        if punishment_type not in ['BAN', 'MUTE']:
             return None
 
         issued_at = punishment.get('issuedAt')
@@ -459,8 +473,10 @@ def tournament_validate_recipients(tournament_id: int):
         }
 
     def _is_disqualifying(punishment: dict) -> bool:
+        """ Decides whether or not a player should be disqualified. """
         end_at = punishment.get('end_at')
         if end_at is None:
+            # Players with permanent punishments should be disqualified.
             return True
 
         lookback_seconds = 30 * 24 * 60 * 60 if punishment.get('type') == 'BAN' else 7 * 24 * 60 * 60
@@ -486,6 +502,7 @@ def tournament_validate_recipients(tournament_id: int):
         return data
 
     def _player_disqualification_record(player_name: str) -> dict | None:
+        """ Get punishment record if disqualified. """
         if player_name in seen_players:
             return disqualification_cache.get(player_name)
 
@@ -955,7 +972,6 @@ def handle_http_exception(e):
 def handle_exception(e):
     from app import db
     db.session.rollback()
-    current_app.logger.exception('Unhandled exception: %s', e)
 
     def _is_retryable_db_error(error: Exception) -> bool:
         if not isinstance(error, OperationalError):
@@ -964,6 +980,8 @@ def handle_exception(e):
         message = str(error).lower()
         retryable_phrases = (
             'server closed the connection unexpectedly',
+            'connection has been closed unexpectedly',
+            'could not receive data from server',
             'connection refused',
             'terminating connection',
         )
@@ -971,9 +989,14 @@ def handle_exception(e):
 
     reload_page = _is_retryable_db_error(e)
 
+    if reload_page:
+        current_app.logger.warning('Transient database connection error: %s', e)
+    else:
+        current_app.logger.exception('Unhandled exception: %s', e)
+
     try:
         error_message = (
-            'The database connection dropped. Reloading the page to try again.'
+            'The database connection dropped unexpectedly. Please refresh the page to reconnect.'
             if reload_page else
             'An unexpected error occurred.'
         )

@@ -125,6 +125,13 @@
         }
     </script>
 
+    <script>
+        window.openPortal = function (playerName) {
+            const url = 'https://ngmc.co/p/' + encodeURIComponent(playerName);
+            window.open(url, '_blank');
+        };
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
