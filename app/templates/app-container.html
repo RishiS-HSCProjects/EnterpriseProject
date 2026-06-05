@@ -104,11 +104,23 @@
     </script>
 
     <script>
-        // Warn users on small / touch devices that the UI is not suited for them
+        // Warn users on small screens that the UI is not suited for them
         document.addEventListener('DOMContentLoaded', () => {
-            const smallScreen = window.innerWidth && window.innerWidth < 1024;
-            if (smallScreen) {
-                alert('Note: This site is best viewed on a desktop. The UI may not be suited for small or touch devices.');
+            if (!sessionStorage.getItem('smallScreenWarningDismissed', 'false')) {
+                const smallScreen = window.innerWidth && window.innerWidth < 1024;
+                if (smallScreen) {
+                    alert('Note: This site is best viewed on a desktop. The UI may not be suited for small devices.');
+                    sendFlashMessage("For the best experience, please use a desktop or laptop computer.", "warning");
+                    sessionStorage.setItem('smallScreenWarningDismissed', 'true');
+                }
+            }
+
+            if (!sessionStorage.getItem('touchWarningDismissed', 'false')) {
+                const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+                if (isTouchDevice) {
+                    sendFlashMessage("This site is not optimised for touch devices and may have usability issues. For the best experience, please use a desktop or laptop computer.", "warning");
+                    sessionStorage.setItem('touchWarningDismissed', 'true');
+                }
             }
         });
     </script>
@@ -127,8 +139,13 @@
 
     <script>
         window.openPortal = function (playerName) {
+            if (!playerName) {
+                console.error("No player name provided for portal link.");
+                sendFlashMessage("Something went wrong when opening the portal.", "error");
+                return;
+            }
             const url = 'https://ngmc.co/p/' + encodeURIComponent(playerName);
-            window.open(url, '_blank');
+            window.open(url, '_blank', 'noopener,noreferrer');
         };
     </script>
 

@@ -198,14 +198,19 @@ def dashboard():
     podium_players = []
     if last_tournament:
         last_lb = last_tournament.get_leaderboard(round_num=None).get_entries(limit=3)
-        # On validation, avatar is pulled from top victors. Dig into the validation registry for that value (instead of pulling it each time)
-        for player in last_tournament.validation_registry().get('recipients', {}).get('global', {}).values():
-            podium_players.append({
-                'xuid': player.get('xuid'),
-                'ign': player['player'],
-                'avatar': player.get('avatar') or url_for('main.static', filename='img/head.png'),
-                'value': next((entry.score for entry in last_lb if entry.player == player['player']), None)
-            })
+        try:
+            # On validation, avatar is pulled from top victors. Dig into the validation registry for that value (instead of pulling it each time)
+            for player in last_tournament.validation_registry().get('recipients', {}).get('global', {}).values():
+                podium_players.append({
+                    'xuid': player.get('xuid'),
+                    'ign': player['player'],
+                    'avatar': player.get('avatar') or url_for('main.static', filename='img/head.png'),
+                    'value': next((entry.score for entry in last_lb if entry.player == player['player']), None)
+                })
+        except Exception as e:
+            current_app.logger.warning(f"Failed to fetch validation registry for last tournament podium: {e}")
+            # Fallback to just showing ign and score from the leaderboard if validation registry fails
+            podium_players = None # Hide podium if validation registry fails
 
     return render_template('dashboard.html', kpis=kpis, last_tournament=last_tournament, podium_players=podium_players)
 

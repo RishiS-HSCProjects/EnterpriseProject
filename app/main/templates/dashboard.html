@@ -57,7 +57,7 @@
     {%- set rank_label = '3rd place' -%}
     {%- set medal_type = 'bronze' -%}
 {%- endif -%}
-<div class="podium-card" onclick="openPortal('{{ xuid }}')" role="button" tabindex="0" aria-label="{{ ign }} ({{ rank_label }}) with value {{ value }}. Click to view profile." title="View {{ ign }}'s portal profile">
+<div class="podium-card" onclick="openPortal({{ xuid|tojson }});" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); openPortal({{ xuid|tojson }}); }" role="button" tabindex="0" aria-label="{{ ign }} ({{ rank_label }}) with value {{ value }}. Click to view profile." title="View {{ ign }}'s portal profile">
     <div class="podium-rank-badge" aria-hidden="true">
         <img src="{{ url_for('main.static', filename='img/medal-' + medal_type + '.svg') }}" alt="" class="trophy-icon">
         <span class="podium-rank">{{ rank_label }}</span>
@@ -69,7 +69,7 @@
 
     <div class="podium-info">
         <h3 class="ign">{{ ign }}</h3>
-        <p class="value">{{ value }} Total Kills</p>
+        <p class="value">{{ value or 'Unknown' }} Total Kills</p>
     </div>
 </div>
 {% endmacro %}
