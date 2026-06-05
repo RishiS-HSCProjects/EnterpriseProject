@@ -251,7 +251,7 @@
                         </ol>
                     {% else %}
                         <div class="no-results">
-                            <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                            <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.{% if current_user.is_authenticated and not cache_stats_locked and not tournament.is_upcoming %}<br><strong>ADMIN</strong>: Please click the Cache Stats button at the bottom of this page to update tournament values.{% endif %}</p>
                         </div>
                     {% endif %}
                 {% else %}
@@ -283,13 +283,13 @@
                                     <li data-player="{{ p.player|e }}">{{ p.player }}: {{ p.score }} kills</li>
                                 {% else %}
                                     <div class="no-results">
-                                        <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                                        <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.{% if current_user.is_authenticated and not cache_stats_locked and not tournament.is_upcoming %}<br><strong>ADMIN</strong>: Please click the Cache Stats button at the bottom of this page to update tournament values.{% endif %}</p>
                                     </div>
                                 {% endfor %}
                             </ol>
                             {% else %}
                             <div class="no-results">
-                                <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.</p>
+                                <p>No leaderboard data available for this round yet.<br>Try a different round or check live updates on the <a href="https://ngmc.co/tournament" target="_blank" rel="noreferrer" style="text-decoration: underline;">Portal</a>.{% if current_user.is_authenticated and not cache_stats_locked and not tournament.is_upcoming %}<br><strong>ADMIN</strong>: Please click the Cache Stats button at the bottom of this page to update tournament values.{% endif %}</p>
                             </div>
                             {% endif %}
                         </section>

@@ -341,7 +341,7 @@ class Tournament(db.Model):
 
         return bool(archives.get('recipients_validated', False))
 
-    def _validation_registry(self) -> dict:
+    def validation_registry(self) -> dict:
         """Return the persisted validation payload, if it exists."""
         archives = self.archives or {}
         if not isinstance(archives, dict):
@@ -352,13 +352,13 @@ class Tournament(db.Model):
 
     def _validated_recipients(self) -> dict[str, list[dict[str, object]] | dict[str, dict[str, object]]]:
         """Return the saved recipient validation payload grouped by reward scope."""
-        validation = self._validation_registry()
+        validation = self.validation_registry()
         recipients = validation.get('recipients')
         return recipients if isinstance(recipients, dict) else {}
 
     def validated_disqualified_players(self) -> set[str]:
         """Return the set of players rejected by recipient validation."""
-        validation = self._validation_registry()
+        validation = self.validation_registry()
         disqualified_players = validation.get('disqualifiedPlayers') or []
 
         players: set[str] = set()

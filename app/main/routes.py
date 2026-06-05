@@ -13,6 +13,7 @@ from app.utils.discord_webhook_utils import ChannelWebhookUrl, format_placement_
 from time import time
 from datetime import datetime, UTC
 from werkzeug.exceptions import HTTPException
+from sqlalchemy.exc import OperationalError
 
 main_bp = Blueprint("main", __name__, template_folder="templates", static_folder="static", static_url_path="/main/static")
 
@@ -27,13 +28,8 @@ def dashboard():
         href: str | None = None
         attrs: dict[str, str] = field(default_factory=dict)
 
-    def _format_days(value: int) -> str:
-        return "1" if value == 1 else str(value)
-
-    def _format_day_label(value: int) -> str:
-        return "day" if value == 1 else "days"
-
     def _format_round_duration(seconds: float) -> str:
+        """ Format round duration to h/m/s """
         total_seconds = max(0, int(round(seconds)))
         if total_seconds < 60:
             return f"{total_seconds} seconds"
@@ -50,12 +46,31 @@ def dashboard():
 
         return f"{hours}h {minutes}m"
 
+    def _format_countdown(seconds: float) -> str:
+        """ Format countdown in to h/m/s """
+        total_seconds = max(0, int(seconds))
+        if total_seconds < 60:
+            return f"{total_seconds}s"
+        if total_seconds < 3600:
+            minutes = total_seconds // 60
+            seconds_left = total_seconds % 60
+            return f"{minutes}m {seconds_left}s"
+        if total_seconds < 86400:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            return f"{hours}h" if not minutes else f"{hours}h {minutes}m"
+
+        days = total_seconds // 86400
+        hours = (total_seconds % 86400) // 3600
+        return f"{days}d" if not hours else f"{days}d {hours}h"
+
     now_ts = int(datetime.now(UTC).timestamp())
     tournaments = Tournament.query.order_by(Tournament.start_unix.asc()).all()
 
+    # Get first tournament where the condition is met. Iterate through until condition is met.
     active_tournament = next((t for t in tournaments if t.start_unix <= now_ts <= t.end_unix), None)
     next_tournament = next((t for t in tournaments if t.start_unix > now_ts), None)
-    last_tournament = next((t for t in reversed(tournaments) if t.end_unix < now_ts), None)
+    last_tournament = next((t for t in reversed(tournaments) if t.end_unix < now_ts), None) # Reverse for faster computation
 
     kpis: list[KPI] = []
 
@@ -64,12 +79,16 @@ def dashboard():
             active_tournament.round_count,
             max(1, int((now_ts - active_tournament.start_unix) // active_tournament.round_duration) + 1),
         )
+        next_round_unix = min(
+            active_tournament.end_unix,
+            active_tournament.start_unix + (current_round * active_tournament.round_duration),
+        )
         kpis.append(KPI(
             title="Active Tournament",
             value=str(current_round),
             detail=f"of {active_tournament.round_count} rounds",
             hover_text=f"{active_tournament.name} is currently running.",
-            href=url_for('main.tournament_editor', tournament_id=active_tournament.id)
+            href=url_for('main.tournament_editor', tournament_id=active_tournament.id),
         ))
         kpis.append(KPI(
             title="Status",
@@ -81,8 +100,13 @@ def dashboard():
         kpis.append(KPI(
             title="Round Duration",
             value=_format_round_duration(active_tournament.round_duration),
-            detail=f"{str(max(1, int(round(active_tournament.round_duration))))} seconds per round",
-            hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds."
+            detail=f"{_format_countdown(next_round_unix - now_ts)} remaining",
+            hover_text=f"Each round lasts about {active_tournament.round_duration:.0f} seconds.",
+            attrs={
+                "data-kpi-kind": "countdown",
+                "data-kpi-target-unix": str(next_round_unix),
+                "data-kpi-countdown-field": "detail",
+            },
         ))
     elif next_tournament:
         kpis.append(KPI(
@@ -114,8 +138,8 @@ def dashboard():
             days_ago = max(0, (now_ts - last_tournament.end_unix) // 86400)
             kpis.append(KPI(
                 title="Last Tournament",
-                value=_format_days(days_ago),
-                detail=f"{_format_day_label(days_ago)} ago",
+                value=str(days_ago),
+                detail=f"day{'s' * (days_ago != 1)} ago", # Handle plural case
                 href=url_for('main.tournament_editor', tournament_id=last_tournament.id),
                 hover_text=f"Last tournament: {last_tournament.name}"
             ))
@@ -169,7 +193,26 @@ def dashboard():
             hover_text="There is no completed tournament to summarize yet."
         ))
 
-    return render_template('dashboard.html', kpis=kpis)
+
+    # Get data for last tournament podium, if available
+    podium_players = []
+    if last_tournament:
+        last_lb = last_tournament.get_leaderboard(round_num=None).get_entries(limit=3)
+        try:
+            # On validation, avatar is pulled from top victors. Dig into the validation registry for that value (instead of pulling it each time)
+            for player in last_tournament.validation_registry().get('recipients', {}).get('global', {}).values():
+                podium_players.append({
+                    'xuid': player.get('xuid'),
+                    'ign': player['player'],
+                    'avatar': player.get('avatar') or url_for('main.static', filename='img/head.png'),
+                    'value': next((entry.score for entry in last_lb if entry.player == player['player']), None)
+                })
+        except Exception as e:
+            current_app.logger.warning(f"Failed to fetch validation registry for last tournament podium: {e}")
+            # Fallback to just showing ign and score from the leaderboard if validation registry fails
+            podium_players = None # Hide podium if validation registry fails
+
+    return render_template('dashboard.html', kpis=kpis, last_tournament=last_tournament, podium_players=podium_players)
 
 @main_bp.route('/scheduler', methods=['GET', 'POST'])
 def scheduler(open_add_modal=False):
@@ -264,6 +307,8 @@ def tournament_editor(tournament_id: int):
     elif request.method == 'POST':
         save_form_state(form, form_id='tournament_editor')
 
+    # Only process changes if authenticated.
+    # This way, even if the js is intercepted, the db will not change unless the server says they are authenticated.
     if current_user.is_authenticated:
         form = restore_form_state(form)
 
@@ -356,6 +401,7 @@ def tournament_editor(tournament_id: int):
         round_leaderboards.append(round_data)
 
     def _banner_time(dt, ts):
+        """ Create string for banner time on the page. Uses local timezone. """
         local_dt = dt.astimezone()
         local_text = f"{local_dt.day} {local_dt.strftime('%B %Y at %H:%M')}"
         return f"{local_text} ({_relative_logic(ts, now_ts)})"
@@ -408,7 +454,7 @@ def tournament_validate_recipients(tournament_id: int):
 
     def _normalize_punishment(punishment: dict):
         punishment_type = str(punishment.get('type') or '').upper()
-        if punishment_type not in {'BAN', 'MUTE'}:
+        if punishment_type not in ['BAN', 'MUTE']:
             return None
 
         issued_at = punishment.get('issuedAt')
@@ -432,24 +478,40 @@ def tournament_validate_recipients(tournament_id: int):
         }
 
     def _is_disqualifying(punishment: dict) -> bool:
+        """ Decides whether or not a player should be disqualified. """
         end_at = punishment.get('end_at')
         if end_at is None:
+            # Players with permanent punishments should be disqualified.
             return True
 
         lookback_seconds = 30 * 24 * 60 * 60 if punishment.get('type') == 'BAN' else 7 * 24 * 60 * 60
         cutoff = tourney.start_unix - lookback_seconds
         return end_at >= tourney.start_unix or end_at >= cutoff
 
-    def _player_disqualification_record(player_name: str) -> dict | None:
+    def _player_data(player_name: str) -> dict | None:
         if player_name in seen_players:
-            return disqualification_cache.get(player_name)
+            return player_data_cache.get(player_name)
 
         seen_players.add(player_name)
         try:
             data = User.get_player_data(player_name)
         except Exception:
-            disqualification_cache[player_name] = None
+            player_data_cache[player_name] = None
             return None
+
+        if not isinstance(data, dict):
+            player_data_cache[player_name] = None
+            return None
+
+        player_data_cache[player_name] = data
+        return data
+
+    def _player_disqualification_record(player_name: str) -> dict | None:
+        """ Get punishment record if disqualified. """
+        if player_name in seen_players:
+            return disqualification_cache.get(player_name)
+
+        data = _player_data(player_name)
 
         raw_punishments = []
         if isinstance(data, dict):
@@ -489,6 +551,7 @@ def tournament_validate_recipients(tournament_id: int):
         return record
 
     seen_players: set[str] = set()
+    player_data_cache: dict[str, dict | None] = {}
     disqualification_cache: dict[str, dict | None] = {}
 
     def _select_top_qualified(entries, required: int = 3):
@@ -541,8 +604,9 @@ def tournament_validate_recipients(tournament_id: int):
     def resolve_entry(player):
         if not player:
             return None
+        player_data = _player_data(player)
         xuid = tourney._resolve_player_xuid(player)
-        return {'player': player, 'xuid': xuid}
+        return {'player': player, 'xuid': xuid, 'avatar': (player_data or {}).get('avatar', url_for('main.static', filename='img/head.png'))}
 
     recipients = {
         'round_firsts': [{ 'round': e['round'], **(resolve_entry(e['player']) or {'player': None, 'xuid': None}) } for e in round_firsts],
@@ -558,6 +622,11 @@ def tournament_validate_recipients(tournament_id: int):
     validation_payload = {
         'disqualifiedPlayers': list(disqualified_records.values()),
         'recipients': recipients,
+        'playerData': {
+            player: {'avatar': data.get('avatar')}
+            for player, data in player_data_cache.items()
+            if isinstance(data, dict)
+        },
     }
 
     from app import db
@@ -896,7 +965,10 @@ def handle_http_exception(e):
         current_app.logger.debug('HTTP error %s: %s', e.code, e)
 
     try:
-        return render_template('error.html', error=e.description, code=e.code), e.code
+        description = e.description
+        if e.code == 500:
+            description = 'An unexpected error occurred. Please refresh the page and try again, or go back using the button below.'
+        return render_template('error.html', error=description, code=e.code), e.code
     except Exception:
         current_app.logger.exception('Failed to render HTTP error page: %s', e)
         return f'Error {e.code}: {e.description}', e.code
@@ -905,10 +977,36 @@ def handle_http_exception(e):
 def handle_exception(e):
     from app import db
     db.session.rollback()
-    current_app.logger.exception('Unhandled exception: %s', e)
+
+    def _is_retryable_db_error(error: Exception) -> bool:
+        if not isinstance(error, OperationalError):
+            return False
+
+        message = str(error).lower()
+        retryable_phrases = (
+            'server closed the connection unexpectedly',
+            'connection has been closed unexpectedly',
+            'could not receive data from server',
+            'connection refused',
+            'terminating connection',
+        )
+        return any(phrase in message for phrase in retryable_phrases)
+
+    reload_page = _is_retryable_db_error(e)
+
+    if reload_page:
+        current_app.logger.warning('Transient database connection error: %s', e)
+    else:
+        current_app.logger.exception('Unhandled exception: %s', e)
 
     try:
-        return render_template('error.html', error='An unexpected error occurred.', code=500), 500
+        error_message = (
+            'The database connection dropped unexpectedly. Please refresh the page to reconnect.'
+            if reload_page else
+            'An unexpected error occurred.'
+        )
+
+        return render_template('error.html', error=error_message, code=500, reload_page=reload_page), 500
     except Exception:
         current_app.logger.exception('Failed to render error page after exception: %s', e)
         return 'Error 500: An unexpected error occurred.', 500

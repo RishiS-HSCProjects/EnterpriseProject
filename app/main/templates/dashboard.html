@@ -17,6 +17,15 @@
     </div>
     <hr>
     {% endif %}
+
+    {% if podium_players %}
+    <h2 style="margin: 1.5rem 0;">{{ last_tournament.name }}</h2>
+    <div id="last-tournament-podium">
+        {% for player in podium_players %}
+            {{ podium_macro(xuid=player.get('xuid'), ign=player.get('ign'), head=player.get('avatar'), value=player.get('value'), rank=loop.index) }}
+        {% endfor %}
+    </div>
+    {% endif %}
 {% endblock %}
 
 {% macro kpi_macro(title, value, detail, hover_text, card_id, href=None, attrs=None) %}
@@ -34,4 +43,33 @@
     <p class="kpi-bottom">{{ detail }}</p>
 </article>
 {% endif %}
+{% endmacro %}
+
+{% macro podium_macro(xuid, ign, head, value, rank=None) %}
+{%- set rank_label = 'Participant' -%}
+{%- if rank == 1 -%}
+    {%- set rank_label = '1st place' -%}
+    {%- set medal_type = 'gold' -%}
+{%- elif rank == 2 -%}
+    {%- set rank_label = '2nd place' -%}
+    {%- set medal_type = 'silver' -%}
+{%- elif rank == 3 -%}
+    {%- set rank_label = '3rd place' -%}
+    {%- set medal_type = 'bronze' -%}
+{%- endif -%}
+<div class="podium-card" onclick="openPortal({{ xuid|tojson }});" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); openPortal({{ xuid|tojson }}); }" role="button" tabindex="0" aria-label="{{ ign }} ({{ rank_label }}) with value {{ value }}. Click to view profile." title="View {{ ign }}'s portal profile">
+    <div class="podium-rank-badge" aria-hidden="true">
+        <img src="{{ url_for('main.static', filename='img/medal-' + medal_type + '.svg') }}" alt="" class="trophy-icon">
+        <span class="podium-rank">{{ rank_label }}</span>
+    </div>
+
+    <div class="podium-avatar">
+        <img src="{{ head }}" alt="Avatar of {{ ign }}">
+    </div>
+
+    <div class="podium-info">
+        <h3 class="ign">{{ ign }}</h3>
+        <p class="value">{{ value or 'Unknown' }} Total Kills</p>
+    </div>
+</div>
 {% endmacro %}

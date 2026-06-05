@@ -31,12 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         roundSelector.addEventListener('change', showRoundLeaderboard);
     }
 
-    // Open a player portal in a new tab
-    window.openPortal = function (playerName) {
-        const url = 'https://ngmc.co/p/' + encodeURIComponent(playerName);
-        window.open(url, '_blank');
-    };
-
     function bindLeaderboardPlayers() {
         document.querySelectorAll('li[data-player]').forEach((item) => {
             const playerName = item.dataset.player || '';
@@ -400,10 +394,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 infoEl.style.display = 'none';
             } else {
                 const { display, utc, relative } = window.TimeUtils.formatDateLocal(value);
-                infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${value}</code>`;
+                const isoUtc = new Date(value * 1000).toISOString(); // Convert epoch to ms and then to ISO string
+                infoEl.innerHTML = `<strong>${display}</strong> | Epoch: <code>${value}</code> | ISO (8601): <code>${isoUtc}</code>`;
                 infoEl.title = `GMT: ${utc} | ${relative}`;
                 infoEl.style.display = 'block';
-                infoEl.dataset.value = value;
+                infoEl.dataset.value = isoUtc;
             }
         };
 
