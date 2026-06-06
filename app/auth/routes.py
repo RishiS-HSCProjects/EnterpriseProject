@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, jsonify, render_template, redirect, url_for, session
+from flask import Blueprint, current_app, jsonify, render_template, redirect, request, url_for, session
 from app import db
 from app.models.tournament import Tournament
 from app.models.user import InvalidPassword, User, UserRole, UserNotFound, UserAlreadyExists
@@ -6,6 +6,7 @@ from app.models.whitelist import UserNotWhitelisted, Whitelist
 from app.utils.utils import (
     flash_all_form_errors, flash, save_form_state, restore_form_state
 )
+from urllib.parse import urlparse, urljoin
 
 auth_bp = Blueprint("auth", __name__, template_folder="templates", static_folder="static", static_url_path="/auth/static")
 
@@ -14,6 +15,8 @@ def login():
     from app.forms import LoginForm
     form = LoginForm()
     form = restore_form_state(form)
+
+    next_page = request.args.get('next')
 
     def add_username_error(message: str) -> None:
         form.username.errors = [*form.username.errors, message]
@@ -26,25 +29,34 @@ def login():
             if user and user.check_password(form.password.data) and (user.validate()[0] if current_app.config.get('VERIFY_STAFF_STATUS') else True):
                 user.login()
                 flash('Login successful.', 'success')
+
+                def is_safe_url(target):
+                    """Ensures the redirect target stays within the same domain name."""
+                    ref_url = urlparse(request.host_url)
+                    test_url = urlparse(urljoin(request.host_url, target))
+                    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+                if next_page and is_safe_url(next_page):
+                    return redirect(next_page)
                 return redirect(url_for('main.dashboard'))
             else:
                 # Any issues? Flash errors and refresh
                 add_username_error("Invalid username or password.")
                 flash_all_form_errors(form)
                 save_form_state(form, 'login_form')
-                return redirect(url_for('auth.login'))
+                return redirect(url_for('auth.login', next=next_page))
         except UserNotWhitelisted as exc:
             # Handle specific issue (not-whitelisted error)
             add_username_error(str(exc))
             flash_all_form_errors(form)
             save_form_state(form, 'login_form')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('auth.login', next=next_page))
         except Exception as exc:
             # Handle general cases
             current_app.logger.error(f"Unexpected error during user creation: {exc}")
             flash("An unexpected error occurred. Please try again.")
             save_form_state(form, 'login_form')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('auth.login', next=next_page))
     elif form.errors: flash_all_form_errors(form) # Any other issues? Flash errors
 
     return render_template('login.html', form=form)

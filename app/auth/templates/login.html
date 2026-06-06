@@ -4,7 +4,7 @@
 
 {% block form %}
     <h2>Login</h2>
-    <form method="POST" action="{{ url_for('auth.login') }}">
+    <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
         {{ form.hidden_tag() }}
 
         <div class="form-group">
@@ -21,5 +21,16 @@
             {{ form.submit(class="auth-button auth-button-primary") }}
             <a href="{{ url_for('auth.register') }}" class="auth-button auth-button-secondary">Create a Staff Account</a>
         </div>
-    </form>
+    </form>    
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script>
+        const lastVisited = sessionStorage.getItem('lastVisitedPage');
+        if (lastVisited) {
+            const loginForm = document.getElementById('loginForm');
+            loginForm.action = "{{ url_for('auth.login') }}?next=" + encodeURIComponent(lastVisited);
+        }
+    </script>
 {% endblock %}

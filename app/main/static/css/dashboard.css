@@ -16,6 +16,7 @@ hr {
 
 /* Card container */
 #kpi-panel .kpi-card {
+    container-type: inline-size;
     background: var(--primary);
     border-radius: 8px;
     padding: 0.9rem 0.95rem;
@@ -71,12 +72,13 @@ hr {
     justify-content: center;
     align-items: center;
     text-align: center;
-    font-size: clamp(1.5rem, 3.8vw, 3rem);
+    font-size: clamp(2rem, 18cqw + 1rem, 3.5rem); 
     font-weight: 800;
     line-height: 1;
     color: var(--text-on-primary);
     padding: 0.2rem 0;
-    word-break: normal;
+    word-break: break-word;
+    white-space: normal;
     overflow-wrap: anywhere;
 }
 

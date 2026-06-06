@@ -172,15 +172,15 @@ def dashboard():
             winner = last_winner[0]
             kpis.append(KPI(
                 title="Last Overall Winner",
-                value=str(winner.score),
-                detail=f"{winner.player}",
+                value=f"{winner.player}",
+                detail=f"{str(winner.score)} kills",
                 hover_text=f"Top performer from {last_tournament.name}.",
                 href=url_for('main.tournament_editor', tournament_id=last_tournament.id)
             ))
         else:
             kpis.append(KPI(
                 title="Last Overall Winner",
-                value="0",
+                value="N/A",
                 detail=f"{last_tournament.name} no leaderboard data",
                 hover_text="The last tournament has no archived overall leaderboard yet.",
                 href=url_for('main.tournament_editor', tournament_id=last_tournament.id)
@@ -188,7 +188,7 @@ def dashboard():
     else:
         kpis.append(KPI(
             title="Last Overall Winner",
-            value="0",
+            value="N/A",
             detail="No finished tournaments yet",
             hover_text="There is no completed tournament to summarize yet."
         ))

@@ -9,3 +9,7 @@
 {% block scripts %}
     <script src="{{ url_for('auth.static', filename='js/registration.js') }}"></script>
 {% endblock %}
+
+{% block page_config %}
+const isRegistrationPage = true;
+{% endblock %}
