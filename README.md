@@ -1,4 +1,4 @@
-# PLX Management System
+# NetherGames Tournament Management System
 
 This project is a proposed PWA for NetherGames that automates the manual parts of LiveOps work, with a focus on tournament tracking and reward handling. The goal is to reduce repetitive staff effort while still keeping sensitive actions under human approval.
 
@@ -60,65 +60,69 @@ If you want to test out the full functionality of the website, you can run a loc
     pip install -r requirements.txt
     ```
 
-    > [!TIP]
+    > PLEASE NOTE: 
     > It is recommended to use a **virtual environment** configured with Python 3.13 for the best compatibility and performance.
 
-3. Create an `.env` file in the `app/` directory with the following content, replacing the placeholders with your actual values:
+3. Create an `.env` file in the `app/` directory (find the `app/.env.example` file and remove the `.example` extension) and add the following content, replacing the placeholders with your actual values:
     ```
-    SECRET_KEY = choose_a_secure_random_key_here
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'  # If you want to use a local SQLite database for testing, REMOVE this line.
+    # Visit https://github.com/RishiS-HSCProjects/EnterpriseProject#setup-instructions for more setup instructions.
 
-    # Setup production environment
-    DEBUG = False
-    FLASK_ENV = production
+    # Create a random secret key for encrypting session data
+    SECRET_KEY = abc123-def456-ghi789-jkl012
 
-    NETHERGAMES_API_KEY = use.your.actual.api.key.here # Required for fetching tournament data and player validation
+    # You may use any database URI here.
+    # If you want to use a local SQLite database for testing, simply remove the `SQLALCHEMY_DATABASE_URI` line and follow the instructions in the next step (step 5). 
+    SQLALCHEMY_DATABASE_URI = 'postgresql://username:password@url:port/mydatabaseuri'
 
-    # Set up Discord environment variables for announcements. Required. You can create a test Discord server and webhook for testing purposes.
-    SECURE_DISCORD_WEBHOOK_URL = https://discord.com/api/webhooks/<WEBHOOK_ID>/<WEBHOOK_TOKEN>
-    ANNOUNCEMENT_DISCORD_WEBHOOK_URL = https://discord.com/api/webhooks/<WEBHOOK_ID>/<WEBHOOK_TOKEN>
+    NETHERGAMES_API_KEY = nethergames.api.integration.key # Required for fetching tournament data and player validation
 
-    VERIFY_STAFF_STATUS = False # Set to True to enable staff status verification against the NetherGames API, optional. False recommended for testing.
+    # Set up Discord environment variables for announcements. Required. (You can create a test Discord server and generate a webhook for testing purposes.)
+    SECURE_DISCORD_WEBHOOK_URL = https://discord.com/api/webhooks/<WEBHOOK_ID_1>/<WEBHOOK_TOKEN_1>
+    ANNOUNCEMENT_DISCORD_WEBHOOK_URL = https://discord.com/api/webhooks/<WEBHOOK_ID_2>/<WEBHOOK_TOKEN_2>
 
+    # Security settings
+    VERIFY_STAFF_STATUS = False # Set to `True` to enable staff status verification against the NetherGames API, optional. False recommended for testing.
     ```
 5. Create the database.
     If you are using a server-hosted database, make sure it is set up and the URI is correctly specified in the `.env` file.
 
     If you want to use a local SQLite database for testing:
         - Remove the `SQLALCHEMY_DATABASE_URI` line from your `.env` file.
-        - Create a new file named `plx.db` in `instance\plx.db` (the `instance` folder should be a **sibling** of the `app` directory in the root of the project, i.e. in the same directory as this `README.md` file).
+        - Create a new file named `tourney.db` in `instance\tourney.db`. This will be your SQLite database file.
 
 6. Configure the database.
-    Run the following commands in your terminal to set up the database schema:
+    Run one of the following commands in your terminal to set up the database schema:
     ```bash
-    set FLASK_APP=run.py # On Windows
-    export FLASK_APP=run.py # On macOS/Linux
+    set FLASK_APP=run.py # For Windows
+    ```
+    ```bash
+    export FLASK_APP=run.py # For macOS/Linux
     ```
     Then, run the Flask shell:
     ```bash
-    flask shell
-    from app import db
-    db.drop_all() # This will delete all existing data in the database.
-    db.create_all() # This will create the database tables based on the defined models.
+    flask shell         # Opens the Flask shell
+    from app import db  # Import the database instance from your application
+    db.drop_all()       # This will delete all existing data in the database (if any).
+    db.create_all()     # This will create the database tables based on the defined models.
     db.session.commit() # Commit the changes to the database.
-    exit() # Exit the Flask shell.
+    exit()              # Exits the shell instance
     ```
 
 7. Run the Flask development server:
     ```bash
     flask run
     ```
-    
-    Open your web browser and navigate to `http://localhost:3000/` (unless otherwise stated in the console) to access the application.
+
+    Open your web browser and navigate to the link specified in the console (e.g. `http://localhost:3000/`) to access the application.
 
 ## Creating your First Staff Account
 This service uses a whitelisting system to avoid unauthorised access to sensitive features. As a result, you will need to whitelist an Xbox account in the database first before you can log in with it. To do this, follow the instructions below:
 
-1. Open the database in a database management tool (e.g., DB Browser for SQLite if using SQLite, database management tools within your development environment (IDE), DBeaver for server-hosted databases, etc).
+1. Open the database in a database management tool (e.g., DB Browser for SQLite if using SQLite, database management tools within your development environment, DBeaver for server-hosted databases, etc).
 2. Insert a new record into the `whitelist` table with the following values:
     - `xuid`: The XUID of the Xbox account you want to whitelist. You can find this by searching for the account's in-game username on the [NetherGames Portal](https://ngmc.co/p) and looking for the XUID in the URL or account details.
     - `username`: The in-game username of the account. Needs to match with the associated XUID.
-    - `whitelisted_at`: Should automatically be set to the current timestamp when the record is created. If not, you can manually set it to YYYY-MM-DD HH:MM:SS.mmm format (e.g., 2026-06-12 08:30:00.000).
+    - `whitelisted_at`: Should automatically be set to the current timestamp when the record is created. If not, you can manually set it to `YYYY-MM-DD HH:MM:SS.mmm` format (e.g., `2026-06-12 08:30:00.000`).
     - `whitelisted_by`: You can leave this blank.
     - `whitelisted_by_xuid`: You can leave this blank or set it to your own XUID.
 3. Use the account registration tool within the application (https://ng-tournies.onrender.com/register). Please note that an OTP code will be sent to the Secure Channel Discord webhook for verification, so make sure you have access to the Discord server associated with the webhook URL you provided in the `.env` file.
@@ -133,7 +137,9 @@ As a result, if you want to test the application while not being registered to t
 
 Since your instance of the application is separate from the live version, using the `MegaRabyteYT` account for testing will not affect the live platform or its data. You can safely use this account to explore and test the features of the application without any impact on the actual operations of NetherGames.
 
+Please note that this method may not work after the 28th of June, 2026, as the API structure detailing staff and rank status may change after the closure of NetherGames.
+
 # Contact
-This project was developed for a school assessment task and is NOT an official product of NetherGames. If you are a server owner or staff member and are interested in having this service implemented for your own server, or if you have any questions about the project, feel free to contact me on Discord at `megarabyte` (723100946296602674).
+This project was developed for a school-based assessment task and is NOT an official product of NetherGames. If you are a server owner or staff member and are interested in having this service implemented for your own server, or if you have any questions about the project, feel free to contact me on Discord at [`megarabyte` (723100946296602674)](https://discord.com/users/723100946296602674).
 
 Thank you for taking the time to explore this project!

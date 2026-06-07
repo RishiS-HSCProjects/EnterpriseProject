@@ -15,7 +15,7 @@ login_manager.login_view = 'auth.login' # type: ignore
 login_manager.login_message_category = 'info'
 
 class Config:
-    """Configuration settings for PLX Management System Flask application."""
+    """Configuration settings for the Flask application."""
     DEBUG = os.getenv('DEBUG', 'false').lower() in ['true', '1', 'yes']
     FLASK_ENV = os.getenv('FLASK_ENV', 'production')
 
@@ -28,7 +28,7 @@ class Config:
     if _db_uri and _db_uri.strip():
         SQLALCHEMY_DATABASE_URI = _db_uri
     else:
-        default_db = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'instance', 'plx.db')
+        default_db = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'instance', 'tourney.db')
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{default_db}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
