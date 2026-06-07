@@ -255,6 +255,7 @@ def scheduler(open_add_modal=False):
                         name=(add_form.name.data or '').strip(),
                         start_unix=start,
                         end_unix=end,
+                        stat_columns=add_form.stat_columns.data or [],
                         round_count=rounds,
                         created_by=current_user.id,
                         tournament_info_discord_message=(add_form.discord_message.data or '').strip(),
@@ -272,6 +273,14 @@ def scheduler(open_add_modal=False):
 
         elif request.method == 'POST':
             flash_all_form_errors(add_form)
+        else:
+            add_form.round_count.data = 7 # Default round count to 7 for better UX, since most tournaments have 7 rounds
+            add_form.round_first_prize.data = "1 month Titan Rank, 3000 XP"
+            add_form.round_second_prize.data = "2500 XP"
+            add_form.round_third_prize.data = "2000 XP"
+            add_form.global_first_prize.data = "1 month Titan Rank, +10 Levels"
+            add_form.global_second_prize.data = "+7 Levels"
+            add_form.global_third_prize.data = "+5 Levels"
 
     # 3. Consolidate Remaining UI State
     kwargs['add_form'] = add_form
@@ -295,6 +304,7 @@ def tournament_editor(tournament_id: int):
         form.name.data = tourney.name
         form.start_unix.data = tourney.start_unix
         form.end_unix.data = tourney.end_unix
+        form.stat_columns.data = tourney.stat_columns or []
         form.round_count.data = tourney.round_count
         form.discord_message.data = getattr(tourney, 'tournament_info_discord_message', None) or ''
         prizes = getattr(tourney, 'prizes', {}) or {}
@@ -336,6 +346,7 @@ def tournament_editor(tournament_id: int):
             else:
                 tourney.name = (form.name.data or '').strip()
                 tourney.start_unix, tourney.end_unix, tourney.round_count = int(start), int(end), int(rounds)
+                tourney.stat_columns = form.stat_columns.data or []
                 tourney.prizes = {
                     'overall_first': (form.global_first_prize.data or '').strip(),
                     'overall_second': (form.global_second_prize.data or '').strip(),
@@ -415,7 +426,7 @@ def tournament_editor(tournament_id: int):
         'selected_round': current_round or (round_numbers[-1] if round_numbers else None),
         'cache_stats_locked': tourney.is_archived(),
         'reward_package_options': list(RewardPackageTypes),
-        'epoch_details': {
+        'tourney_details': {
             'start_gmt': start_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'end_gmt': end_dt.strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'start_local_title': f"{start_dt.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')}",
@@ -424,7 +435,8 @@ def tournament_editor(tournament_id: int):
             'end_relative_title': f"{_relative_logic(tourney.end_unix, now_ts)}",
             'start_banner_text': _banner_time(start_dt, tourney.start_unix),
             'end_banner_text': _banner_time(end_dt, tourney.end_unix),
-            'round_secs': f"{tourney.round_duration:.0f}"
+            'round_secs': f"{tourney.round_duration:.0f}",
+            "stat_columns": ",".join(tourney.stat_columns)
         }
     })
 
@@ -449,6 +461,11 @@ def tournament_validate_recipients(tournament_id: int):
         return jsonify({'success': False, 'message': 'Access denied. Managers only.'}), 403
 
     tourney = Tournament.query.get_or_404(tournament_id)
+
+    if tourney.recipients_validated_status is not False:
+        return jsonify({'success': False, 'message': 'Validation already in progress or completed. Please check back later.'}), 400
+    else: tourney.recipients_validated = int(current_user.id) # Prevents duplicate validations
+
     from app.models.user import User
     from app import db
 
@@ -640,8 +657,9 @@ def tournament_validate_recipients(tournament_id: int):
         db.session.add(tourney)
         db.session.commit()
     except Exception as exc:
-        current_app.logger.exception('Failed to persist validated recipients: %s', exc)
-        return jsonify({'success': False, 'message': 'Failed to persist recipients.'}), 500
+        tourney.recipients_validated = False # Reset validation status on failure to allow retrying
+        current_app.logger.exception('Failed to save validated recipients: %s', exc)
+        return jsonify({'success': False, 'message': 'Failed to save recipients.'}), 500
 
     return jsonify({'success': True, 'message': 'Recipients validated and saved.', 'recipients': recipients, 'disqualifiedPlayers': validation_payload['disqualifiedPlayers']})
 

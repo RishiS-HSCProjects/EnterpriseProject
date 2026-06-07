@@ -175,8 +175,9 @@ hr {
     line-height: 1.2;
     font-weight: 700;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-align: center;
+    word-wrap: break-word;
+    white-space: normal;
 }
 
 #last-tournament-podium .podium-info .value {

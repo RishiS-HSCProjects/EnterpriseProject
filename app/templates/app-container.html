@@ -152,14 +152,16 @@
     <script>
         {% block page_config %}
         const isRegistrationPage = false;
+        const isErrorPage = false;
         {% endblock %}
 
         if (!isRegistrationPage) {
             sessionStorage.setItem('lastVisitedPage', window.location.href);
         }
 
-        console.debug("Page config:", { isRegistrationPage });
-        console.debug("Last visited page:", { lastVisitedPage: sessionStorage.getItem('lastVisitedPage') });
+        if (!isErrorPage) {
+            sessionStorage.removeItem('main:error-reload-attempted');
+        }
     </script>
 
     {% block scripts %}{% endblock %}

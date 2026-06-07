@@ -4,12 +4,27 @@
 
 {% block head %}
     {{ super() }}
+    {# Select2 CSS - For the multi-select stat columns input #}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/css/select2.min.css" rel="stylesheet" />
+
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/scheduler.css') }}">
 {% endblock %}
 
 {% block scripts %}
     <script src="{{ url_for('main.static', filename='js/time-utils.js') }}"></script>
     <script src="{{ url_for('main.static', filename='js/scheduler.js') }}"></script>
+
+    {# Select2 #}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> {# JQuery is a dependency for Select2 #}
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
+    <script>
+    $(document).ready(function () {
+        $('select[multiple]').select2({
+            placeholder: "Select stats to track (Hold Ctrl to select multiple)",
+            allowClear: true
+        });
+    });
+    </script>
 {% endblock %}
 
 {% block page_content %}
@@ -101,6 +116,19 @@
                 {% endif %}
             </div>
 
+            <!-- Stat Columns -->
+            <div class="form-group">
+                {{ add_form.stat_columns.label(class="field-label") }}
+                {{ add_form.stat_columns(class="field-input", id="stat-columns-input", multiple=True, size=5) }}
+                {% if add_form.stat_columns.errors %}
+                    <div class="field-errors">
+                        {% for error in add_form.stat_columns.errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
             <!-- Round Count -->
             <div class="form-group">
                 {{ add_form.round_count.label(class="field-label") }}
@@ -118,7 +146,7 @@
             <!-- Discord Message -->
             <div class="form-group">
                 {{ add_form.discord_message.label(class="field-label") }}
-                {{ add_form.discord_message(class="field-textarea") }}
+                {{ add_form.discord_message(class="field-textarea", maxlength="600", placeholder="Any special instructions for the tournament? Place it here and it will be displayed in the Discord announcement! Maximum 600 characters.") }}
                 {% if add_form.discord_message.errors %}
                     <div class="field-errors">
                         {% for error in add_form.discord_message.errors %}

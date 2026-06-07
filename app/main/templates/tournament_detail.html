@@ -4,8 +4,12 @@
 
 {% block head %}
     {{ super() }}
+    {# Select2 CSS - For the multi-select stat columns input #}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/css/select2.min.css" rel="stylesheet" />
+
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/scheduler.css') }}">
     <link rel="stylesheet" href="{{ url_for('main.static', filename='css/tournament.css') }}">
+
 
     {% if current_user.is_authenticated %}
     <style>
@@ -24,6 +28,19 @@
     </script>
     <script src="{{ url_for('main.static', filename='js/time-utils.js') }}"></script>
     <script src="{{ url_for('main.static', filename='js/tournament-detail.js') }}"></script>
+
+    {# Select2 #}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> {# JQuery is a dependency for Select2 #}
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
+
+    <script>
+    $(document).ready(function () {
+        $('select[multiple]').select2({
+            placeholder: "Select stats to track (Hold Ctrl to select multiple)",
+            allowClear: true
+        });
+    });
+    </script>
 {% endblock %}
 
 {% block page_content %}
@@ -46,8 +63,8 @@
                     {{ form.start_unix.label(class="field-label") }}
                     <input type="date" id="start-date-picker" class="field-input" />
                     {{ form.start_unix(class="field-input", id="start-unix-input", hidden="") }}
-                    <p class="time-info" id="start-info" title="Local: {{ epoch_details.start_local_title }} ({{ epoch_details.start_relative_title }})">
-                        {{ epoch_details.start_gmt }}
+                    <p class="time-info" id="start-info" title="Local: {{ tourney_details.start_local_title }} ({{ tourney_details.start_relative_title }})">
+                        {{ tourney_details.start_gmt }}
                     </p>
                 </div>
 
@@ -55,8 +72,19 @@
                     {{ form.end_unix.label(class="field-label") }}
                     <input type="date" id="end-date-picker" class="field-input" />
                     {{ form.end_unix(class="field-input", id="end-unix-input", hidden="") }}
-                    <p class="time-info" id="end-info" title="Local: {{ epoch_details.end_local_title }} ({{ epoch_details.end_relative_title }})">
-                        {{ epoch_details.end_gmt }}
+                    <p class="time-info" id="end-info" title="Local: {{ tourney_details.end_local_title }} ({{ tourney_details.end_relative_title }})">
+                        {{ tourney_details.end_gmt }}
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    {{ form.stat_columns.label(class="field-label") }}
+                    {{ form.stat_columns(class="field-input", multiple=True, size=10) }}
+                    <p class="time-info" id="stat-columns-info"
+                        {% if current_user.is_authenticated %}title="Use these values in the Portal"{% endif %}
+                        data-value="{{ tourney_details.stat_columns }}"
+                    >
+                        Click to copy stat column names.
                     </p>
                 </div>
 
@@ -64,7 +92,7 @@
                     {{ form.round_count.label(class="field-label") }}
                     {{ form.round_count(class="field-input", id="round-count-input") }}
                     <p class="time-info" id="epoch-duration" {% if current_user.is_authenticated %}title="Use this value in the Portal" {% endif %}>
-                        Round Duration: {{ epoch_details.round_secs }} seconds
+                        Round Duration: {{ tourney_details.round_secs }} seconds
                     </p>
                 </div>
 
@@ -235,7 +263,7 @@
                 <div class="tournament-status-banner">
                     <p class="banner-title">This tournament has not started yet.</p>
                     <p class="banner-copy">Leaderboards will appear once the tournament begins.</p>
-                    <p class="banner-meta">Starts: {{ epoch_details.start_banner_text }}</p>
+                    <p class="banner-meta">Starts: {{ tourney_details.start_banner_text }}</p>
                 </div>
             {% else %}
                 <h3 class="leaderboard-heading">Leaderboard - Overall</h3>
@@ -318,7 +346,9 @@
                 <hr>
                 <div id="reward-packages-panel" class="reward-packages-panel" data-package-url="{{ url_for('main.tournament_package_stats', tournament_id=tournament.id) }}">
                     <h3 class="reward-packages-heading">Stats Packaging</h3>
-                    {% if tournament.recipients_validated %}
+                    {% if not tournament.recipients_validated_status in [True, False] %}
+                    <p class="reward-packages-intro">Recipient validation is in progress. This may take a few minutes.</p>
+                    {% elif tournament.recipients_validated_status == True %}
                     <p class="reward-packages-intro">Choose a package type to preview archived winners.</p>
                     <div id="reward-packages-controls" class="reward-packages-controls">
                         <div class="reward-package-control-group">

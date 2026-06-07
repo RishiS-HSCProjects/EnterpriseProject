@@ -75,6 +75,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const statColumnsInfo = document.getElementById('stat-columns-info');
+    if (statColumnsInfo) {
+        statColumnsInfo.addEventListener('click', async () => {
+            if (copyClipboard(statColumnsInfo.dataset.value)) {
+                sendFlashMessage('Stat columns copied to clipboard!', 'success');
+            } else {
+                sendFlashMessage('Something went wrong when trying to copy stat columns to clipboard.', 'error');
+            }
+        });
+    }
+
     const epochDurSec = document.getElementById('epoch-duration');
     if (epochDurSec) {
         epochDurSec.addEventListener('click', async () => {

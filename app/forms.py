@@ -1,5 +1,7 @@
+from enum import Enum
+
 from flask_wtf import FlaskForm
-from wtforms import IntegerField, StringField, PasswordField, SubmitField, TextAreaField
+from wtforms import IntegerField, SelectMultipleField, StringField, PasswordField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Length, EqualTo, NumberRange, Regexp, ValidationError
 class LoginForm(FlaskForm):
     """Form for user login."""
@@ -31,11 +33,26 @@ class VerificationPinForm(FlaskForm):
 
 class AddTournamentForm(FlaskForm):
     """Form for adding a new tournament."""
+
+    STAT_COLUMN_MAP = [
+        ('bw_solo_finals_kills', 'BW Solo Finals'),
+        ('bw_doubles_finals_kills', 'BW Doubles Finals'),
+        ('bw_squads_final_kills', 'BW Squads Finals'),
+        ('bw_1v1_finals_kills', 'BW 1v1 Finals'),
+        ('bw_2v2_finals_kills', 'BW 2v2 Finals'),
+        ('sw_solo_kills', 'SW Solo Kills'),
+        ('sw_doubles_kills', 'SW Doubles Kills'),
+        ('duels_kills', 'Duels Kills'),
+        ('mm_kills', 'MM Kills'),
+        ('cq_kills', 'CQ Kills'),
+    ]
+
     name = StringField('Tournament Name', validators=[DataRequired(), Length(min=3, max=100)])
     start_unix = IntegerField('Start', validators=[DataRequired()])
     end_unix = IntegerField('End', validators=[DataRequired()])
+    stat_columns = SelectMultipleField('Stat Columns', choices=STAT_COLUMN_MAP, validators=[DataRequired()])
     round_count = IntegerField('Number of Rounds', validators=[DataRequired(), NumberRange(min=1)])
-    discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=2000)])
+    discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=600)])
     round_first_prize = StringField('Round First Place Prize', validators=[DataRequired(), Length(max=100)])
     round_second_prize = StringField('Round Second Place Prize', validators=[DataRequired(), Length(max=100)])
     round_third_prize = StringField('Round Third Place Prize', validators=[DataRequired(), Length(max=100)])

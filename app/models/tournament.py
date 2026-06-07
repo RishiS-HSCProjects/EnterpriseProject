@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, UTC
 from enum import Enum, auto
 from flask import current_app
-from sqlalchemy.ext.mutable import MutableDict
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from app import db
 
 class PunishmentType(Enum):
@@ -290,6 +290,7 @@ class Tournament(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     start_unix = db.Column(db.Integer, nullable=False)
     end_unix = db.Column(db.Integer, nullable=False)
+    stat_columns = db.Column(MutableList.as_mutable(db.JSON), default=list, nullable=False)
     round_count = db.Column(db.Integer, nullable=False, default=7)
     tournament_info_discord_message = db.Column(db.String(2000), nullable=True)
     tournament_info_discord_status = db.Column(db.Boolean, nullable=False, default=False)
@@ -333,20 +334,26 @@ class Tournament(db.Model):
         return now > self.end_unix
 
     @property
-    def recipients_validated(self) -> bool:
-        """Return whether recipient validation has already completed."""
+    def recipients_validated_status(self) -> int | bool:
+        """Return the raw recipient validation status, which may be a staff ID integer or a boolean."""
         archives = self.archives or {}
         if not isinstance(archives, dict):
-            return False
+            # Should never happen
+            raise ValueError(f"Archives must be a dict, got {type(archives)}")
 
-        return bool(archives.get('recipients_validated', False))
+        status = archives.get('recipients_validated', False)
+
+        if isinstance(status, bool) or isinstance(status, int):
+            return status
+
+        return False
 
     def validation_registry(self) -> dict:
         """Return the persisted validation payload, if it exists."""
         archives = self.archives or {}
         if not isinstance(archives, dict):
-            return {}
-
+            # Should never happen
+            raise ValueError(f"Archives must be a dict, got {type(archives)}")
         validation = archives.get('validation')
         return validation if isinstance(validation, dict) else {}
 
@@ -372,14 +379,17 @@ class Tournament(db.Model):
 
         return players
 
-    @recipients_validated.setter
-    def recipients_validated(self, value: bool) -> None:
+    @recipients_validated_status.setter
+    def recipients_validated(self, value: bool|int) -> None:
         """Persist the recipient validation flag inside the archives JSON."""
         archives = self.archives or {}
         if not isinstance(archives, dict):
             archives = {}
-
-        archives['recipients_validated'] = bool(value)
+        
+        if isinstance(value, int): # int if request has been made. int represents staff id.
+            archives['recipients_validated'] = value
+        else:
+            archives['recipients_validated'] = bool(value)
         self.archives = archives
 
     def get_round_status(self, round_number: int) -> bool:
@@ -888,6 +898,7 @@ class Tournament(db.Model):
         name: str,
         start_unix: int,
         end_unix: int,
+        stat_columns: list[str],
         round_count: int,
         created_by: int,
         tournament_info_discord_message: str | None = None,
@@ -903,6 +914,7 @@ class Tournament(db.Model):
         tournament.name = name
         tournament.start_unix = int(start_unix)
         tournament.end_unix = int(end_unix)
+        tournament.stat_columns = stat_columns
         tournament.round_count = round_count
         tournament.created_by = created_by
         from app.models.user import User

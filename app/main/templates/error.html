@@ -51,6 +51,11 @@
     </style>
 {% endblock %}
 
+{% block page_config %}
+{{ super() }}
+const isErrorPage = 'true';
+{% endblock %}
+
 {% block page_content %}
     <p class="error-message">{{ error }}</p>
     {% if reload_page %}
@@ -66,7 +71,7 @@
             }
 
             sessionStorage.setItem(key, '1');
-            window.setTimeout(() => window.location.reload(), 1500); // 1.5 second delay to allow the server time to cold-start if needed
+            window.setTimeout(() => window.location.reload(), 1000); // 1 second delay to allow the server time to cold-start if needed
         })();
     </script>
     {% endif %}
