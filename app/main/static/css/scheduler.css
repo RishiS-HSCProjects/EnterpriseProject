@@ -243,7 +243,7 @@
     color: var(--primary);
     border-radius: 4px;
     padding: 2px 8px;
-    margin-top: 4px;
+    margin-top: 7.5px;
 }
 
 /* Tag remove button */
@@ -284,6 +284,11 @@
     color: var(--text-on-background);
     border: 1px solid rgba(255,255,255,0.06);
     margin: auto auto;
+}
+
+.select2-selection__clear {
+    color: white;
+    margin-top: 7.5px;
 }
 
 /* Options */
