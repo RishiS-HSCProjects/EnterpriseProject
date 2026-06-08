@@ -196,11 +196,11 @@ def dashboard():
 
     # Get data for last tournament podium, if available
     podium_players = []
-    if last_tournament:
-        last_lb = last_tournament.get_leaderboard(round_num=None).get_entries(limit=3)
+    if (last_validated_tourney := next((t for t in reversed(tournaments) if t.recipients_validated_status), None)):
+        last_lb = last_validated_tourney.get_leaderboard(round_num=None).get_entries(limit=3)
         try:
             # On validation, avatar is pulled from top victors. Dig into the validation registry for that value (instead of pulling it each time)
-            for player in last_tournament.validation_registry().get('recipients', {}).get('global', {}).values():
+            for player in last_validated_tourney.validation_registry().get('recipients', {}).get('global', {}).values():
                 podium_players.append({
                     'xuid': player.get('xuid'),
                     'ign': player['player'],
@@ -212,7 +212,7 @@ def dashboard():
             # Fallback to just showing ign and score from the leaderboard if validation registry fails
             podium_players = None # Hide podium if validation registry fails
 
-    return render_template('dashboard.html', kpis=kpis, last_tournament=last_tournament, podium_players=podium_players)
+    return render_template('dashboard.html', kpis=kpis, last_validated_tourney=last_validated_tourney, podium_players=podium_players)
 
 @main_bp.route('/scheduler', methods=['GET', 'POST'])
 def scheduler(open_add_modal=False):

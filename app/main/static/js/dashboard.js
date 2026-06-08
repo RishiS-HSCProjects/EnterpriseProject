@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const detailEl = card.querySelector('.kpi-bottom');
 
         const secondsRemaining = Math.max(0, targetUnix - Math.floor(Date.now() / 1000));
-        const countdownText = `${formatCountdown(secondsRemaining)}`;
+        const countdownText = `${formatCountdown(secondsRemaining)} remaining`;
         targetEl.textContent = countdownText;
 
         if (titleEl && valueEl && detailEl) {

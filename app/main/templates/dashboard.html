@@ -19,7 +19,7 @@
     {% endif %}
 
     {% if podium_players %}
-    <h2 style="margin: 1.5rem 0;">Previous Tournament: {{ last_tournament.name }}</h2>
+    <h2 style="margin: 1.5rem 0;">Previous Tournament: {{ last_validated_tourney.name }}</h2>
     <div id="last-tournament-podium">
         {% for player in podium_players %}
             {{ podium_macro(xuid=player.get('xuid'), ign=player.get('ign'), head=player.get('avatar'), value=player.get('value'), rank=loop.index) }}

@@ -39,7 +39,7 @@ class Whitelist(db.Model):
         excepted, data = User.validate_user(username)
 
         if not excepted:
-            raise PermissionDenied(data)
+            raise PermissionDenied(f"User {username} is not eligible for system access.")
 
         xuid = data.get('xuid')
         if not xuid:
@@ -49,8 +49,7 @@ class Whitelist(db.Model):
         username = data.get('name') # Handle for casing
 
         existing: Whitelist | None = cls.query.filter_by(xuid=xuid).first()
-        if existing:
-            raise UserAlreadyWhitelisted(username)
+        if existing: raise UserAlreadyWhitelisted(username)
 
         whitelist_entry = cls()
         whitelist_entry.xuid = xuid
