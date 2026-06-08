@@ -23,7 +23,7 @@ def login():
 
     if form.validate_on_submit():
         try:
-            user: User = User.query.filter_by(username=form.username.data).first() # type: ignore
+            user: User = User.query.filter(User.username.ilike(form.username.data.strip())).first() # type: ignore
 
             # Found user during login? Password correct? Still staff?
             if user and user.check_password(form.password.data) and (user.validate()[0] if current_app.config.get('VERIFY_STAFF_STATUS') else True):
@@ -44,19 +44,19 @@ def login():
                 add_username_error("Invalid username or password.")
                 flash_all_form_errors(form)
                 save_form_state(form, 'login_form')
-                return redirect(url_for('auth.login', next=next_page))
+                return redirect(url_for('auth.login'))
         except UserNotWhitelisted as exc:
             # Handle specific issue (not-whitelisted error)
             add_username_error(str(exc))
             flash_all_form_errors(form)
             save_form_state(form, 'login_form')
-            return redirect(url_for('auth.login', next=next_page))
+            return redirect(url_for('auth.login'))
         except Exception as exc:
             # Handle general cases
             current_app.logger.error(f"Unexpected error during user creation: {exc}")
             flash("An unexpected error occurred. Please try again.")
             save_form_state(form, 'login_form')
-            return redirect(url_for('auth.login', next=next_page))
+            return redirect(url_for('auth.login'))
     elif form.errors: flash_all_form_errors(form) # Any other issues? Flash errors
 
     return render_template('login.html', form=form)
@@ -90,11 +90,6 @@ def handle_registration_pin():
         return jsonify({"status": "error"}), code
 
     if not form.validate_on_submit(): return fail()
-
-    existing_user = User.query.filter_by(username=form.username.data).first()
-    if existing_user:
-        add_username_error("That username is already registered. Please log in.")
-        return fail()
 
     try:
         user, player_data = User.create_user(

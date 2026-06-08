@@ -264,6 +264,20 @@
     overflow: hidden;
 }
 
+.select2-container--default.select2-container--disabled .select2-selection--multiple {
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.select2-container--default.select2-container--disabled 
+.select2-selection--multiple .select2-selection__choice {
+    padding-left: 3px;
+    opacity: 0.7;
+}
+
+.select2-container--default.select2-container--disabled .select2-selection__clear {
+    display: none;
+}
+
 /* Search inside dropdown */
 .select2-search__field {
     background: transparent;

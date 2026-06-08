@@ -927,7 +927,7 @@ def tournament_cache_stats(tournament_id: int):
             exc,
         )
         message = f'Error archiving stats: {str(exc)}'
-        return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 400
+        return jsonify({'success': False, 'message': message, 'cached_rounds': [], 'failed_rounds': []}), 500
     except Exception:
         current_app.logger.exception('Error caching tournament stats')
         message = 'Unexpected error caching tournament stats'

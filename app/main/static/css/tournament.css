@@ -99,6 +99,7 @@ select.field-input:focus {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    padding-bottom: 12px;
 }
 
 .auth-actions:last-of-type {

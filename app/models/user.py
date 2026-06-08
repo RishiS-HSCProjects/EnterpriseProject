@@ -147,7 +147,7 @@ class User(UserMixin, db.Model):
         """
 
         username = username.strip()
-        user = cls.query.filter_by(username=username).first()
+        user = cls.query.filter(cls.username.ilike(username)).first()
         if user: raise UserAlreadyExists(username)
 
         try:
@@ -162,6 +162,12 @@ class User(UserMixin, db.Model):
 
             if not Whitelist.query.filter_by(xuid=xuid).first():
                 raise UserNotWhitelisted(f"User {username} is not whitelisted.")
+            
+            if User.query.filter_by(xuid=xuid).first():
+                # Very rare edge case where an account with different XUIDs have once had the same username
+                # Should never happen but just in case. # An admin will need to revoke the whitelist entry
+                # for the old account before the new account can be registered.
+                raise UserAlreadyExists(username)
 
             is_admin = any('admin' in rank.lower() for rank in data.get('ranks', []))
 

@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.success) {
                     window.location.reload();
                 } else {
-                    console.log(data);
+                    sendFlashMessage(data.message || 'Failed to cache tournament stats.', 'error');
                 }
             } catch (error) {
                 console.error('Unexpected error caching tournament stats:', error);
@@ -377,7 +377,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         const isAuth = window.__isAuthenticated === true || window.__isAuthenticated === 'true';
         if (!isAuth) {
-            const formElements = document.querySelectorAll('#tournament-edit-form input, #tournament-edit-form textarea');
+            const formElements = document.querySelectorAll('#tournament-edit-form input, #tournament-edit-form textarea, #tournament-edit-form .selection, #tournament-edit-form select');
             formElements.forEach((element) => {
                 element.disabled = true;
             });
