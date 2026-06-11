@@ -2,6 +2,7 @@ import os
 from enum import Enum, auto
 from discord_webhook import DiscordWebhook
 from flask import current_app
+import requests
 
 class ChannelWebhookUrl(Enum):
     SECURE_WEBHOOK_URL = auto()
@@ -28,10 +29,12 @@ def send(
     header: str | None = None,
     timeout: int = 10,
     **kwargs
-) -> bool:
+) -> tuple["requests.Response", bool]:
     """Send a message to a Discord webhook channel.
 
-    Returns True on success, otherwise False.
+    Returns:
+    - requests.Response: The response object from the webhook execution.
+    - bool: True if the message was sent successfully (status code 200 or 204), False otherwise.
     """
 
     if header:
@@ -48,7 +51,7 @@ def send(
         )
 
         response = webhook.execute()
-        return response.status_code in (200, 204)
+        return response, response.status_code in [200, 204] # Discord returns 204 No Content for successful webhook executions without embeds
     except WebhookUrlNotFound as exc:
         current_app.logger.error("Webhook URL not found: %s", exc)
         raise

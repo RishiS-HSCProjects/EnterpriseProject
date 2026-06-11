@@ -101,7 +101,7 @@
                     {% if current_user.is_authenticated and tournament.tournament_info_discord_status %}
                         {{ form.discord_message(class="field-textarea", disabled=True, title="Locked because the tournament announcement has already been sent.") }}
                     {% else %}
-                        {{ form.discord_message(class="field-textarea") }}
+                        {{ form.discord_message(class="field-textarea", maxlength="125", placeholder="Any special instructions for the tournament? Place it here and it will be displayed in the Discord announcement! Maximum 125 characters.") }}
                     {% endif %}
                 </div>
 

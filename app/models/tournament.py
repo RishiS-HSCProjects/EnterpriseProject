@@ -127,9 +127,8 @@ def format_punishments_for_ui(punishments, tournament_start: int) -> list[dict[s
         if end_at >= tournament_start:
             reason = f"{reason} during tournament"
         elif end_at >= tournament_start - lookback:
-            reason = f"{reason} before tournament (within {lookback_days}d lookback)"
-        else:
-            reason = f"{reason} before tournament"
+            reason = f"{reason} within {lookback_days}d before tournament"
+        else: reason = f"{reason} before tournament"
 
         formatted_punishments.append({
             'type': punishment_type.name,

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 from flask import Blueprint, render_template, redirect, url_for, request, current_app, jsonify, abort
 from flask_login import current_user, login_required
 from app.models.tournament import (
@@ -699,12 +700,19 @@ def tournament_send_discord(tournament_id: int):
         f"**Each round will last {round_hours_display} hour{'' if round_hours_display == 1 else 's'}.**"
     )
 
-    if message:
-        message_content += f"\n### Additional Info\n{message}\n"
+    if message: message_content += f"\n### Additional Info\n{message}\n"
 
     message_content += (
-        "\nTo participate, simply play the tournament game as you normally would during the tournament period."
-        "\nYour kills are automatically counted and tracked at https://ngmc.co/tournament."
+        "\nYour kills will automatically be counted and tracked at https://ngmc.co/tournament."
+    )
+
+    message_content += (
+        "\n\n## :clipboard: Tournament Rules\n"
+        "To recieve prizes, players must:\n"
+        "- Not have active punishments during the tournament\n"
+        f"- Have no bans within **30 days** of <t:{tourney.start_unix}:D>\n"
+        f"- Have no mutes within **7 days** of <t:{tourney.start_unix}:D>\n"
+        "- Follow our [Enforcement Policy](https://ngmc.co/enforcement)\n"
     )
 
     prizes = getattr(tourney, 'prizes', {}) or {}
@@ -727,12 +735,15 @@ def tournament_send_discord(tournament_id: int):
                 'third': prizes.get('round_third', 'TBA'),
             })}"
             "\n-# Please note: Titan Rank rewards are not transferable and are applied immediately on issue. Per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable). All other rewards are cumulative across rounds and overall ranking."
-            "\n\n We wish you all the best! Please note that tournament rules and prizes are subject to change. Frequent updates will be posted to <#1466960479485296640>, along with <@&1081345603268792410> pings."
         )
+    message_content += (
+        "\n\n We wish you all the best! Tournament rules and prizes are subject to change, with <@&1081345603268792410> posted here at <#1466960479485296640>."
+        f"\n-# Viewing this message in the future? Visit our [unofficial Tournament Tracking website](https://ng-tournies.onrender.com{url_for('main.tournament_editor', tournament_id=tourney.id)}) for more info about this tournament!"
+    )
 
     try:
         from discord_webhook.constants import MessageFlags
-        ok = discord_send(
+        response, ok = discord_send(
             location=ChannelWebhookUrl.ANNOUNCEMENT_WEBHOOK_URL,
             content=message_content,
             flags=MessageFlags.SUPPRESS_EMBEDS.value
@@ -743,9 +754,13 @@ def tournament_send_discord(tournament_id: int):
             db.session.commit()
             flash('Discord message sent', 'success')
         else:
-            flash('Failed to send Discord message', 'error')
-    except Exception:
+            flash(f'Failed to send Discord message: {json.loads(response.content.decode("utf-8")).get("content", "Unknown error")}', 'error')
+    except json.JSONDecodeError as exc:
+        flash('Failed to send Discord message.', 'error')
+        current_app.logger.exception(f"Discord response content was not valid JSON: {exc}")
+    except Exception as exc:
         flash('Error sending Discord message. Please contact an administrator.', 'error')
+        current_app.logger.exception(f"Unexpected error occurred while sending Discord message: {exc}")
 
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 
@@ -815,11 +830,13 @@ def tournament_send_prizes_discord(tournament_id: int):
         "### Per-Round Prizes\n"
         f"{format_prize_lines(round_prizes)}\n\n"
         "### Overall Prizes\n"
-        f"{format_prize_lines(overall_prizes)}"
+        f"{format_prize_lines(overall_prizes)}\n\n"
+        "Congratulations to all the winners! See you in the next tournament!"
+        f"\n-# Viewing this message in the future? Visit our [unofficial Tournament Tracking website](https://ng-tournies.onrender.com{url_for('main.tournament_editor', tournament_id=tourney.id)}) for more details about this tournament!"
     )
 
     try:
-        ok = discord_send(
+        response, ok = discord_send(
             location=ChannelWebhookUrl.ANNOUNCEMENT_WEBHOOK_URL,
             content=message
         )
@@ -829,9 +846,13 @@ def tournament_send_prizes_discord(tournament_id: int):
             db.session.commit()
             flash('Prize announcement sent', 'success')
         else:
-            flash('Failed to send Discord message')
-    except Exception:
+            flash(f'Failed to send Discord message: {response.content.decode("utf-8")}', 'error')
+    except json.JSONDecodeError as exc:
+        flash('Failed to send Discord message: Invalid response from Discord.', 'error')
+        current_app.logger.exception(f"Discord response content was not valid JSON: {exc}")
+    except Exception as exc:
         flash('Error sending Discord message. Please contact an administrator.', 'error')
+        current_app.logger.exception(f"Unexpected error occurred while sending Discord message: {exc}")
 
     return redirect(url_for('main.tournament_editor', tournament_id=tourney.id))
 

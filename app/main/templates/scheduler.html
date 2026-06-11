@@ -146,7 +146,7 @@
             <!-- Discord Message -->
             <div class="form-group">
                 {{ add_form.discord_message.label(class="field-label") }}
-                {{ add_form.discord_message(class="field-textarea", maxlength="600", placeholder="Any special instructions for the tournament? Place it here and it will be displayed in the Discord announcement! Maximum 600 characters.") }}
+                {{ add_form.discord_message(class="field-textarea", maxlength="125", placeholder="Any special instructions for the tournament? Place it here and it will be displayed in the Discord announcement! Maximum 125 characters.") }}
                 {% if add_form.discord_message.errors %}
                     <div class="field-errors">
                         {% for error in add_form.discord_message.errors %}

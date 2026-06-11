@@ -52,7 +52,7 @@ class AddTournamentForm(FlaskForm):
     end_unix = IntegerField('End', validators=[DataRequired()])
     stat_columns = SelectMultipleField('Stat Columns', choices=STAT_COLUMN_MAP, validators=[DataRequired()])
     round_count = IntegerField('Number of Rounds', validators=[DataRequired(), NumberRange(min=1)])
-    discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=600)])
+    discord_message = TextAreaField('Tournament Info Discord Message (optional)', validators=[Length(max=125)])
     round_first_prize = StringField('Round First Place Prize', validators=[DataRequired(), Length(max=100)])
     round_second_prize = StringField('Round Second Place Prize', validators=[DataRequired(), Length(max=100)])
     round_third_prize = StringField('Round Third Place Prize', validators=[DataRequired(), Length(max=100)])
@@ -81,10 +81,6 @@ class AddTournamentForm(FlaskForm):
             round_duration = total_duration / field.data
             if round_duration < 1800: # 30 mins
                 raise ValidationError('Round duration must be at least 30 minutes. Please increase the time range or reduce the number of rounds.')
-
-    def validate_discord_message(self, field):
-        if field.data and len(field.data) > 2000:
-            raise ValidationError('Discord message cannot exceed 2000 characters.')
 
 class WhitelistAddForm(FlaskForm):
     """Form for adding a staff account to the whitelist."""

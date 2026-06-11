@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    const modal = document.getElementById('add-modal');
-    if (!modal) return;
-
     document.querySelectorAll('.tournament-row[data-tournament-url]').forEach((row) => {
         const url = row.dataset.tournamentUrl;
         if (!url) return;
@@ -10,7 +7,9 @@ document.addEventListener('DOMContentLoaded', function () {
         row.setAttribute('tabindex', '0');
 
         row.addEventListener('click', (event) => {
-            if (event.target.closest('a')) return;
+            if (event.target.tagName.toLowerCase() === 'a' || event.target.closest('a')) {
+                return; // Don't navigate if an actual link was clicked
+            }
             window.location.href = url;
         });
 
@@ -22,7 +21,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    setupFormModal({
+    const modal = document.getElementById('add-modal');
+    if (modal) setupFormModal({
         modalId: 'add-modal',
         openButtonSelector: '.create-tournament-btn',
         formId: 'add-tournament-form',
@@ -46,10 +46,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Update round duration preview when start, end, or round count changes
     const updateRoundDuration = () => {
-        const startVal = parseInt(document.getElementById('start-unix-input').value, 10);
-        const endVal = parseInt(document.getElementById('end-unix-input').value, 10);
-        const roundCountVal = parseInt(document.getElementById('round-count-input').value, 10);
         const previewEl = document.getElementById('round-duration-preview');
+        if (!previewEl) return; // Happens since this js is used on both scheduler and detail pages. 
+                                // Terrible design on my part, I apologise. But I have like five hours
+                                // to submit this, and I can't be bothered. Not like anyone will read
+                                // this... right?
+
+        const startVal = parseInt(document.getElementById('start-unix-input')?.value, 10);
+        const endVal = parseInt(document.getElementById('end-unix-input')?.value, 10);
+        const roundCountVal = parseInt(document.getElementById('round-count-input')?.value, 10);
 
         if (isNaN(startVal) || isNaN(endVal) || isNaN(roundCountVal) || roundCountVal <= 0 || endVal <= startVal) {
             previewEl.textContent = '';
