@@ -41,7 +41,7 @@ Tournament operations will be considered successful if the system:
 
 # How to Run the Code
 
-If you want to look around the **public version** of the website, head to https://ng-tournies.onrender.com/. However, since this version is hooked up to a live database with real integration with the enterprise, you will be unable to access admin accounts or tournament editting features.
+If you want to look around the **public version** of the website, head to https://ng-tournies.onrender.com/. However, since this version is hooked up to a live database with real integration with the enterprise, you will be unable to access admin accounts or tournament editing features.
 
 If you want to test out the full functionality of the website, you can run a local version on your machine by following the instructions below.
 
@@ -49,9 +49,9 @@ If you want to test out the full functionality of the website, you can run a loc
 
 - Python 3.10-3.13 (3.13 recommended) + pip
 - Virtual environment (optional but recommended)
-- An Xbox account which has logged into NetherGames at least once between the 2018 and June 2026. You can check your account status by searching your in-game username on the [NetherGames Portal](https://ngmc.co/p). (Please note that NetherGames will close on the 28th of June, 2026). This is required for integrated player validation features, even if the VERIFY_STAFF_STATUS is set to False. **If you do not have a NetherGames account, you can use the test account `MegaRabyteYT` for testing purposes.** Read #restrictions below for more details.
-- [NetherGames API key](https://portal.nethergames.org/auth/applications) for fetching tournament and player data (required)
 - Discord server and webhook URL for testing announcements (required for account verification and announcement features, but you can use the same webhook for both).
+- [NetherGames API key](https://portal.nethergames.org/auth/applications) for fetching tournament and player data (required for post-tournament (leaderboard) handling)
+- An Xbox account which has logged into NetherGames at least once between the 2018 and June 2026. You can check your account status by searching your in-game username on the [NetherGames Portal](https://ngmc.co/p). This is required for integrated player validation features, even if the VERIFY_STAFF_STATUS is set to False. **If you do not have a NetherGames account, you can use the test account `MegaRabyteYT` for testing purposes.** Read #restrictions below for more details.
 
 ## Setup Instructions
 1. Download or clone the repository to your local machine and create a virtual environment.
@@ -92,15 +92,17 @@ If you want to test out the full functionality of the website, you can run a loc
 
 6. Configure the database.
     Run one of the following commands in your terminal to set up the database schema:
+    _Windows_
     ```bash
-    set FLASK_APP=run.py # For Windows
+    set FLASK_APP=run.py
     ```
+    _MacOS/Linux_
     ```bash
-    export FLASK_APP=run.py # For macOS/Linux
+    export FLASK_APP=run.py
     ```
     Then, run the Flask shell:
     ```bash
-    flask shell         # Opens the Flask shell
+    flask shell
     from app import db  # Import the database instance from your application
     db.drop_all()       # This will delete all existing data in the database (if any).
     db.create_all()     # This will create the database tables based on the defined models.
@@ -122,7 +124,7 @@ This service uses a whitelisting system to avoid unauthorised access to sensitiv
 2. Insert a new record into the `whitelist` table with the following values:
     - `xuid`: The XUID of the Xbox account you want to whitelist. You can find this by searching for the account's in-game username on the [NetherGames Portal](https://ngmc.co/p) and looking for the XUID in the URL or account details.
     - `username`: The in-game username of the account. Needs to match with the associated XUID.
-    - `whitelisted_at`: Should automatically be set to the current timestamp when the record is created. If not, you can manually set it to `YYYY-MM-DD HH:MM:SS.mmm` format (e.g., `2026-06-12 08:30:00.000`).
+    - `whitelisted_at`: Set to the current timestamp or manually set it to `YYYY-MM-DD HH:MM:SS.mmm` format (e.g., `2026-06-12 08:30:00.000`).
     - `whitelisted_by`: You can leave this blank.
     - `whitelisted_by_xuid`: You can leave this blank or set it to your own XUID.
 3. Use the account registration tool within the application (https://ng-tournies.onrender.com/register). Please note that an OTP code will be sent to the Secure Channel Discord webhook for verification, so make sure you have access to the Discord server associated with the webhook URL you provided in the `.env` file.
@@ -131,7 +133,7 @@ This service uses a whitelisting system to avoid unauthorised access to sensitiv
 After changing your role to Admin, you will have full access to the platform's features, including tournament management, announcements, and staff management. You will never need to manually edit the database again after this, as all necessary features for managing the platform are available through the web interface.
 
 ## Restrictions
-Please note that this application regularily checks the NetherGames API for tournament and player data. As a result, you will not be able to create a fake account, even if the `VERIFY_STAFF_STATUS` is set to False, without also creating a corresponding account on the NetherGames network that has logged in at least once between the 2018 and June 2026. This is because the application relies on the XUID, username, and staff status data from the NetherGames API to validate accounts and provide features such as tournament tracking and announcements.
+Please note that this application regularily checks the NetherGames API for tournament and player data. As a result, you will not be able to create a fake account, even if the `VERIFY_STAFF_STATUS` is set to False, without also creating a corresponding account on the NetherGames network that has logged in at least once between the 2018 and June 2026. This is because the application relies on the XUID, username, and staff status data from the NetherGames API to validate accounts and provide features such as tournament tracking and announcements, and an API check is run on account creation regardless of the `VERIFY_STAFF_STATUS` value.
 
 As a result, if you want to test the application while not being registered to the NetherGames network, you may use my profile [`MegaRabyteYT`](https://ngmc.co/p/MegaRabyteYT) for testing purposes, as it has a corresponding XUID and is eligible for access to the platform's features. You can register with the username `MegaRabyteYT` and follow the registration process to create an account linked to that profile. This will allow you to test the application's features without needing to create your own NetherGames account.
 

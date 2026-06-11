@@ -53,7 +53,7 @@ def login():
             return redirect(url_for('auth.login'))
         except Exception as exc:
             # Handle general cases
-            current_app.logger.error(f"Unexpected error during user creation: {exc}")
+            current_app.logger.error(f"Unexpected error during user login: {exc}")
             flash("An unexpected error occurred. Please try again.")
             save_form_state(form, 'login_form')
             return redirect(url_for('auth.login'))
