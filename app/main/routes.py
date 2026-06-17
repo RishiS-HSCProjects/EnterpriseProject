@@ -718,7 +718,7 @@ def tournament_send_discord(tournament_id: int):
     prizes = getattr(tourney, 'prizes', {}) or {}
     if any(prizes.get(key) for key in ['overall_first', 'overall_second', 'overall_third']):
         message_content += (
-            "\n\n## :trophy: Overall Ranking Prizes\n"
+            "\n## :trophy: Overall Ranking Prizes\n"
             "-# Overall Ranking rewards the top 3 players across all rounds. Overall Ranking prizes are cumulative with Per-Round Rewards.\n"
             f"{format_prize_lines({
                 'first': prizes.get('overall_first', 'TBA'),
@@ -734,7 +734,7 @@ def tournament_send_discord(tournament_id: int):
                 'second': prizes.get('round_second', 'TBA'),
                 'third': prizes.get('round_third', 'TBA'),
             })}"
-            "\n-# Please note: Titan Rank rewards are not transferable and are applied immediately on issue. Per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable). All other rewards are cumulative across rounds and overall ranking."
+            "\n-# Please note: Titan Rank rewards are not transferable and per-round Titan Rank rewards are non-cumulative; however, overall ranking players will receive their overall-ranking Titan prize on top of their round-ranking Titan prize (if applicable). All other rewards are cumulative across rounds and overall ranking."
         )
     message_content += (
         "\n\n We wish you all the best! Tournament rules and prizes are subject to change, with <@&1081345603268792410> posted here at <#1466960479485296640>."
@@ -805,7 +805,7 @@ def tournament_send_prizes_discord(tournament_id: int):
             f"### Round {round_num}\n{format_placement_lines(entries)}"
         )
 
-    rounds_text = "\n\n".join(round_sections)
+    rounds_text = "\n".join(round_sections)
 
     optional_message = (tourney.tournament_info_discord_message or '').strip()
 
@@ -825,7 +825,7 @@ def tournament_send_prizes_discord(tournament_id: int):
         f"{rounds_text}\n\n"
 
         f"## :gift: **PRIZES**\n"
-        f"-# <@&1081345603268792410> All prizes have now been distributed. Additions are awarded to accounts automatically. Thank you for participating in the {tourney.name}!\n\n"
+        f"-# <@&1081345603268792410> Titan prizes have now been distributed, and can be claimed from the [Gift Inventory](https://ngmc.co/store). Other prizes will be distributed at a later date. Thank you for participating in the {tourney.name}!\n\n"
 
         "### Per-Round Prizes\n"
         f"{format_prize_lines(round_prizes)}\n\n"
